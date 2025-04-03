@@ -1,0 +1,166 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Vibezsume - Resume Builder</title>
+    <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+    <header>
+        <div class="container">
+            <h1>Vibezsume</h1>
+            <nav>
+                <ul>
+                    <li><a href="#" class="active" id="home-link">Home</a></li>
+                    <li><a href="#" id="builder-link">Resume Builder</a></li>
+                </ul>
+            </nav>
+        </div>
+    </header>
+
+    <main class="container">
+        <!-- Home Page Content -->
+        <section id="home-section">
+            <div class="hero">
+                <h2>Create Professional Resumes in Minutes</h2>
+                <p>Vibezsume helps you build impressive resumes that get noticed by employers</p>
+                <button class="cta-button" id="start-builder">Build Your Resume</button>
+            </div>
+
+            <div class="features">
+                <h3>Why Choose Vibezsume?</h3>
+                <div class="feature-cards">
+                    <div class="card">
+                        <h4>Easy to Use</h4>
+                        <p>Simple step-by-step process to create your resume</p>
+                    </div>
+                    <div class="card">
+                        <h4>Professional Templates</h4>
+                        <p>Your resume will look clean and professional</p>
+                    </div>
+                    <div class="card">
+                        <h4>Download as PDF</h4>
+                        <p>Get your resume in a shareable format</p>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- Resume Builder Content -->
+        <section id="builder-section" class="hidden">
+            <h2>Build Your Resume</h2>
+            <p>Fill out the form below to create your professional resume</p>
+            
+            <div class="progress-bar">
+                <div class="step active" data-step="1">Personal Info</div>
+                <div class="step" data-step="2">Experience</div>
+                <div class="step" data-step="3">Education</div>
+                <div class="step" data-step="4">Skills</div>
+                <div class="step" data-step="5">Summary</div>
+            </div>
+
+            <div class="form-container">
+                <form id="resume-form">
+                    <!-- Step 1: Personal Information -->
+                    <div class="form-step" id="step-1">
+                        <h3>Personal Information</h3>
+                        <div class="form-group">
+                            <label for="name">Full Name</label>
+                            <input type="text" id="name" name="name" required>
+                        </div>
+                        <div class="form-group">
+                            <label for="email">Email</label>
+                            <input type="email" id="email" name="email" required>
+                        </div>
+                        <div class="form-group">
+                            <label for="phone">Phone</label>
+                            <input type="tel" id="phone" name="phone" required>
+                        </div>
+                        <div class="form-buttons">
+                            <button type="button" class="next-btn">Next</button>
+                        </div>
+                    </div>
+
+                    <!-- Step 2: Work Experience -->
+                    <div class="form-step hidden" id="step-2">
+                        <h3>Work Experience</h3>
+                        <div class="form-group">
+                            <label for="experience">Work Experience</label>
+                            <textarea id="experience" name="experience" rows="6" placeholder="Enter your work experience details"></textarea>
+                        </div>
+                        <div class="form-buttons">
+                            <button type="button" class="prev-btn">Previous</button>
+                            <button type="button" class="next-btn">Next</button>
+                        </div>
+                    </div>
+
+                    <!-- Step 3: Education -->
+                    <div class="form-step hidden" id="step-3">
+                        <h3>Education</h3>
+                        <div class="form-group">
+                            <label for="education">Education</label>
+                            <textarea id="education" name="education" rows="6" placeholder="Enter your education details"></textarea>
+                        </div>
+                        <div class="form-buttons">
+                            <button type="button" class="prev-btn">Previous</button>
+                            <button type="button" class="next-btn">Next</button>
+                        </div>
+                    </div>
+
+                    <!-- Step 4: Skills -->
+                    <div class="form-step hidden" id="step-4">
+                        <h3>Skills</h3>
+                        <div class="form-group">
+                            <label for="skill-input">Add Skills</label>
+                            <div class="skill-input-container">
+                                <input type="text" id="skill-input" placeholder="Enter a skill">
+                                <button type="button" id="add-skill-btn">Add</button>
+                            </div>
+                            <div class="skills-list" id="skills-list"></div>
+                            <input type="hidden" id="skills" name="skills">
+                        </div>
+                        <div class="form-buttons">
+                            <button type="button" class="prev-btn">Previous</button>
+                            <button type="button" class="next-btn">Next</button>
+                        </div>
+                    </div>
+
+                    <!-- Step 5: Summary -->
+                    <div class="form-step hidden" id="step-5">
+                        <h3>Professional Summary</h3>
+                        <div class="form-group">
+                            <label for="summary">Summary</label>
+                            <textarea id="summary" name="summary" rows="6" placeholder="Enter a brief professional summary"></textarea>
+                        </div>
+                        <div class="form-buttons">
+                            <button type="button" class="prev-btn">Previous</button>
+                            <button type="submit" class="submit-btn">Generate Resume</button>
+                        </div>
+                    </div>
+                </form>
+            </div>
+        </section>
+
+        <!-- Resume Preview Section (initially hidden) -->
+        <section id="preview-section" class="hidden">
+            <h2>Your Resume</h2>
+            <div class="preview-actions">
+                <button id="edit-resume-btn">Edit Resume</button>
+                <button id="download-resume-btn">Download PDF</button>
+            </div>
+            <div class="resume-preview" id="resume-preview">
+                <!-- Resume content will be inserted here -->
+            </div>
+        </section>
+    </main>
+
+    <footer>
+        <div class="container">
+            <p>&copy; 2025 Vibezsume. All rights reserved.</p>
+        </div>
+    </footer>
+
+    <script src="script.js"></script>
+</body>
+</html>
