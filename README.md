@@ -1,38 +1,34 @@
-# Vibezsume - Simple Resume Builder
+# Vibezsume - Resume Analysis and Builder
 
-A simple, clean resume builder made with vanilla HTML, CSS, and JavaScript.
+A web application for analyzing resumes, matching them against job descriptions, and building professional resumes.
 
 ## Features
 
-- Easy to use interface
-- Multi-step form for resume creation
-- Skills can be added and removed
-- Resume preview
-- Clean, responsive design
+- **Resume Analysis**: Upload your resume (PDF, DOCX) and extract key information
+- **Job Description Analysis**: Analyze job descriptions to identify required and preferred skills
+- **Resume-Job Matching**: Compare your resume against job descriptions to see how well you match
+- **Resume Builder**: Create a professional resume with a step-by-step form
 
-## How to Use
+## Setup and Installation
 
-1. Clone the repository or download the files
-2. Open `index.html` in your web browser
-3. Navigate through the form to build your resume
-4. Generate and preview your resume
-5. In a production environment, you would be able to download your resume as a PDF
+1. Clone the repository
+2. Install dependencies: `pip install -r requirements.txt`
+3. Download spaCy model: `python -m spacy download en_core_web_sm`
+4. Run the application: `uvicorn app.main:app --reload`
+5. Open your browser at http://localhost:8000
 
-## Technologies Used
+## Tech Stack
 
-- HTML5
-- CSS3
-- JavaScript (ES6+)
+- Backend: FastAPI, spaCy, PyMuPDF
+- Frontend: HTML, CSS, JavaScript
+- Text Processing: Regular expressions, NLP
 
 ## Project Structure
 
-- `index.html` - Main HTML file
-- `styles.css` - CSS styling
-- `script.js` - JavaScript functionality
-
-## Future Enhancements
-
-- Implement PDF download functionality using a library like html2pdf.js
-- Add multiple resume templates
-- Add local storage to save resume data
-- Implement server-side storage for user accounts
+- `/app`: Backend code
+  - `/models`: Data models
+  - `/routers`: API endpoints
+  - `/services`: Business logic and services
+  - `/data`: Application data
+- `/static`: Frontend assets (CSS, JavaScript)
+- `index.html`: Main application page

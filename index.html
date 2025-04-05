@@ -14,6 +14,8 @@
                 <ul>
                     <li><a href="#" class="active" id="home-link">Home</a></li>
                     <li><a href="#" id="builder-link">Resume Builder</a></li>
+                    <li><a href="#" id="analyzer-link">Resume Analyzer</a></li>
+                    <li><a href="#" id="job-link">Job Analysis</a></li>
                 </ul>
             </nav>
         </div>
@@ -25,7 +27,10 @@
             <div class="hero">
                 <h2>Create Professional Resumes in Minutes</h2>
                 <p>Vibezsume helps you build impressive resumes that get noticed by employers</p>
-                <button class="cta-button" id="start-builder">Build Your Resume</button>
+                <div class="hero-buttons">
+                    <button class="cta-button" id="start-builder">Build Your Resume</button>
+                    <button class="cta-button secondary" id="start-analyzer">Analyze Your Resume</button>
+                </div>
             </div>
 
             <div class="features">
@@ -40,9 +45,92 @@
                         <p>Your resume will look clean and professional</p>
                     </div>
                     <div class="card">
-                        <h4>Download as PDF</h4>
-                        <p>Get your resume in a shareable format</p>
+                        <h4>Job Matching</h4>
+                        <p>Find out which tech roles match your skills</p>
                     </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- Resume Analyzer Section -->
+        <section id="analyzer-section" class="hidden">
+            <h2>Resume Analyzer</h2>
+            <p>Upload your existing resume to analyze it and find matching job roles</p>
+            
+            <div class="upload-container">
+                <form id="resume-upload-form" class="upload-form">
+                    <div class="form-group file-upload">
+                        <label for="resume-file">Upload Resume (PDF, DOCX)</label>
+                        <input type="file" id="resume-file" name="file" accept=".pdf,.docx,.doc">
+                        <div class="file-upload-info">Supported formats: PDF, DOCX</div>
+                    </div>
+                    <button type="submit" id="upload-resume-btn" class="cta-button">Analyze Resume</button>
+                </form>
+                <div id="upload-status"></div>
+            </div>
+            
+            <div id="analysis-results" class="hidden">
+                <h3>Analysis Results</h3>
+                <div class="results-container">
+                    <div class="extracted-info">
+                        <h4>Extracted Information</h4>
+                        <div id="resume-data"></div>
+                    </div>
+                    
+                    <div class="job-matches">
+                        <h4>Matching Job Roles</h4>
+                        <div id="job-matches-list"></div>
+                    </div>
+                </div>
+                
+                <div class="analysis-actions">
+                    <button id="edit-extracted-btn" class="cta-button secondary">Edit & Build Resume</button>
+                </div>
+            </div>
+        </section>
+
+        <!-- Job Description Section -->
+        <section id="job-description-section" class="hidden">
+            <h2>Job Description Analysis</h2>
+            <p>Enter a job description to analyze the requirements and match against your resume</p>
+            
+            <div class="upload-container">
+                <form id="job-description-form" class="upload-form">
+                    <div class="form-group">
+                        <label for="job-url">Job Posting URL (optional)</label>
+                        <input type="url" id="job-url" name="job_url" placeholder="https://example.com/job">
+                    </div>
+                    <div class="form-group">
+                        <label for="job-description">Job Description</label>
+                        <textarea id="job-description" name="job_description" rows="10" placeholder="Paste the job description here..."></textarea>
+                    </div>
+                    <button type="submit" id="analyze-job-btn" class="cta-button">Analyze Job</button>
+                </form>
+                <div id="job-analysis-status"></div>
+            </div>
+            
+            <div id="job-analysis-results" class="hidden">
+                <h3>Job Analysis Results</h3>
+                <div class="results-container">
+                    <div class="job-info">
+                        <h4>Job Information</h4>
+                        <div id="job-data"></div>
+                    </div>
+                    
+                    <div class="skill-requirements">
+                        <h4>Skill Requirements</h4>
+                        <div id="skill-requirements-list"></div>
+                    </div>
+                </div>
+                
+                <div class="job-match-section">
+                    <h4>Resume Match</h4>
+                    <p>Compare your resume against this job description:</p>
+                    <div class="job-match-actions">
+                        <button id="match-resume-btn" class="cta-button" disabled>Compare with My Resume</button>
+                        <span id="match-resume-status">(Upload your resume first)</span>
+                    </div>
+                    <div id="resume-job-match" class="hidden"></div>
                 </div>
             </div>
         </section>

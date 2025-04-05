@@ -1,395 +1,336 @@
-/* Reset and Base Styles */
-* {
-    margin: 0;
-    padding: 0;
-    box-sizing: border-box;
-}
+/* Add these styles at appropriate locations in your existing CSS file */
 
-body {
-    font-family: 'Arial', sans-serif;
-    line-height: 1.6;
-    color: #333;
-    background-color: #f4f8fb;
-}
-
-.container {
-    max-width: 1200px;
-    margin: 0 auto;
-    padding: 0 20px;
-}
-
-.hidden {
-    display: none !important;
-}
-
-/* Header Styles */
-header {
-    background-color: #4a90e2;
-    color: white;
-    padding: 1rem 0;
-}
-
-header .container {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-}
-
-header h1 {
-    font-size: 1.8rem;
-}
-
-header nav ul {
-    display: flex;
-    list-style: none;
-}
-
+/* Header Nav Items */
 header nav ul li {
     margin-left: 1.5rem;
 }
 
-header nav ul li a {
-    color: white;
-    text-decoration: none;
-    padding: 0.5rem;
-    border-radius: 4px;
+/* Hero Section */
+.hero-buttons {
+    display: flex;
+    justify-content: center;
+    gap: 1rem;
+    margin-top: 2rem;
 }
 
-header nav ul li a:hover,
-header nav ul li a.active {
-    background-color: rgba(255, 255, 255, 0.2);
+.cta-button.secondary {
+    background-color: transparent;
+    border: 2px solid #4a90e2;
+    color: #4a90e2;
 }
 
-/* Main Content Styles */
-main {
-    padding: 2rem 0;
+.cta-button.secondary:hover {
+    background-color: rgba(74, 144, 226, 0.1);
 }
 
-/* Home Page Styles */
-.hero {
-    text-align: center;
-    padding: 3rem 0;
-}
-
-.hero h2 {
-    font-size: 2.5rem;
-    margin-bottom: 1rem;
-    color: #2c3e50;
-}
-
-.hero p {
-    font-size: 1.2rem;
-    margin-bottom: 2rem;
-    color: #5d6d7e;
-    max-width: 800px;
-    margin-left: auto;
-    margin-right: auto;
-}
-
-.cta-button {
-    background-color: #4a90e2;
-    color: white;
-    border: none;
-    padding: 0.8rem 2rem;
-    font-size: 1.1rem;
-    border-radius: 4px;
-    cursor: pointer;
-    transition: background-color 0.3s;
-}
-
-.cta-button:hover {
-    background-color: #3a80d2;
-}
-
-.features {
-    padding: 3rem 0;
+/* Resume Analyzer Styles */
+#analyzer-section {
     text-align: center;
 }
 
-.features h3 {
-    font-size: 2rem;
-    margin-bottom: 2rem;
-    color: #2c3e50;
-}
-
-.feature-cards {
-    display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
-    gap: 2rem;
-}
-
-.card {
-    background-color: white;
-    border-radius: 8px;
-    padding: 2rem;
-    box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
-    transition: transform 0.3s;
-}
-
-.card:hover {
-    transform: translateY(-5px);
-}
-
-.card h4 {
-    font-size: 1.4rem;
-    margin-bottom: 1rem;
-    color: #2c3e50;
-}
-
-/* Resume Builder Styles */
-#builder-section {
-    text-align: center;
-}
-
-#builder-section h2 {
+#analyzer-section h2 {
     font-size: 2.2rem;
     margin-bottom: 1rem;
     color: #2c3e50;
 }
 
-.progress-bar {
-    display: flex;
-    justify-content: space-between;
-    margin: 2rem 0;
-    padding: 0 1rem;
-    position: relative;
-}
-
-.progress-bar::before {
-    content: '';
-    position: absolute;
-    top: 50%;
-    left: 0;
-    width: 100%;
-    height: 2px;
-    background-color: #ddd;
-    transform: translateY(-50%);
-    z-index: -1;
-}
-
-.step {
-    background-color: white;
-    border: 2px solid #ddd;
-    border-radius: 50%;
-    width: 30px;
-    height: 30px;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    font-weight: bold;
-    position: relative;
-    z-index: 1;
-}
-
-.step::after {
-    content: attr(data-step);
-}
-
-.step.active {
-    border-color: #4a90e2;
-    background-color: #4a90e2;
-    color: white;
-}
-
-.form-container {
+.upload-container {
     background-color: white;
     border-radius: 8px;
     box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
     padding: 2rem;
-    max-width: 800px;
-    margin: 0 auto;
+    max-width: 600px;
+    margin: 2rem auto;
+}
+
+.upload-form {
     text-align: left;
 }
 
-.form-step {
-    padding: 1rem 0;
-}
-
-.form-group {
+.file-upload {
+    border: 2px dashed #ddd;
+    padding: 2rem;
+    border-radius: 4px;
+    text-align: center;
     margin-bottom: 1.5rem;
+    transition: border-color 0.3s;
 }
 
-.form-group label {
-    display: block;
-    margin-bottom: 0.5rem;
-    font-weight: bold;
+.file-upload:hover {
+    border-color: #4a90e2;
 }
 
-.form-group input,
-.form-group textarea {
-    width: 100%;
-    padding: 0.75rem;
-    border: 1px solid #ddd;
-    border-radius: 4px;
-    font-size: 1rem;
-}
-
-.form-buttons {
-    display: flex;
-    justify-content: space-between;
-    margin-top: 2rem;
-}
-
-.prev-btn,
-.next-btn,
-.submit-btn {
-    background-color: #4a90e2;
-    color: white;
-    border: none;
-    padding: 0.75rem 1.5rem;
-    border-radius: 4px;
-    cursor: pointer;
-    font-size: 1rem;
-}
-
-.prev-btn {
-    background-color: #95a5a6;
-}
-
-.skill-input-container {
-    display: flex;
-    gap: 0.5rem;
-}
-
-.skill-input-container button {
-    background-color: #4a90e2;
-    color: white;
-    border: none;
-    padding: 0.75rem 1rem;
-    border-radius: 4px;
-    cursor: pointer;
-}
-
-.skills-list {
-    display: flex;
-    flex-wrap: wrap;
-    gap: 0.5rem;
+.file-upload input {
     margin-top: 1rem;
 }
 
-.skill-tag {
-    background-color: #e3f2fd;
-    border: 1px solid #bbdefb;
-    border-radius: 20px;
-    padding: 0.25rem 0.75rem;
-    display: flex;
-    align-items: center;
+.file-upload-info {
+    margin-top: 0.5rem;
+    font-size: 0.9rem;
+    color: #7f8c8d;
 }
 
-.skill-tag span {
-    margin-right: 0.5rem;
-}
-
-.remove-skill {
-    background: none;
-    border: none;
-    color: #4a90e2;
-    cursor: pointer;
+#upload-status {
+    margin-top: 1rem;
+    padding: 0.75rem;
+    border-radius: 4px;
     font-weight: bold;
 }
 
-/* Resume Preview Styles */
-#preview-section {
-    max-width: 800px;
-    margin: 0 auto;
+#upload-status.success {
+    background-color: #e8f5e9;
+    color: #2e7d32;
 }
 
-.preview-actions {
-    display: flex;
-    justify-content: center;
-    gap: 1rem;
+#upload-status.error {
+    background-color: #ffebee;
+    color: #c62828;
+}
+
+/* Analysis Results */
+#analysis-results {
+    margin-top: 2rem;
+    text-align: left;
+}
+
+.results-container {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 2rem;
     margin: 2rem 0;
 }
 
-.preview-actions button {
-    background-color: #4a90e2;
-    color: white;
-    border: none;
-    padding: 0.75rem 1.5rem;
-    border-radius: 4px;
-    cursor: pointer;
-}
-
-.preview-actions button:first-child {
-    background-color: #95a5a6;
-}
-
-.resume-preview {
+.extracted-info, .job-matches {
     background-color: white;
-    box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
-    padding: 3rem;
     border-radius: 8px;
+    box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+    padding: 1.5rem;
 }
 
-.resume-header {
-    text-align: center;
-    margin-bottom: 2rem;
-}
-
-.resume-section {
-    margin-bottom: 1.5rem;
-}
-
-.resume-section h3 {
-    border-bottom: 1px solid #ddd;
+.extracted-info h4, .job-matches h4 {
+    color: #2c3e50;
+    margin-bottom: 1rem;
     padding-bottom: 0.5rem;
+    border-bottom: 1px solid #eee;
+}
+
+.resume-data-item {
     margin-bottom: 1rem;
 }
 
-.resume-skills {
-    display: flex;
-    flex-wrap: wrap;
-    gap: 0.5rem;
+.resume-data-item strong {
+    display: block;
+    color: #4a90e2;
+    margin-bottom: 0.25rem;
 }
 
-.resume-skill {
-    background-color: #f5f5f5;
-    padding: 0.25rem 0.5rem;
+.job-match-card {
+    background-color: #f8f9fa;
     border-radius: 4px;
+    padding: 1rem;
+    margin-bottom: 1rem;
+    border-left: 4px solid;
 }
 
-/* Footer Styles */
-footer {
-    background-color: #2c3e50;
-    color: white;
-    padding: 1.5rem 0;
+.job-match-card.excellent {
+    border-left-color: #2ecc71;
+}
+
+.job-match-card.good {
+    border-left-color: #3498db;
+}
+
+.job-match-card.moderate {
+    border-left-color: #f39c12;
+}
+
+.job-match-card.weak {
+    border-left-color: #e74c3c;
+}
+
+.job-match-score {
+    font-weight: bold;
+    margin-bottom: 0.5rem;
+}
+
+.job-match-card.excellent .job-match-score {
+    color: #2ecc71;
+}
+
+.job-match-card.good .job-match-score {
+    color: #3498db;
+}
+
+.job-match-card.moderate .job-match-score {
+    color: #f39c12;
+}
+
+.job-match-card.weak .job-match-score {
+    color: #e74c3c;
+}
+
+.analysis-actions {
+    display: flex;
+    justify-content: center;
+    margin-top: 2rem;
+}
+
+/* Job Description Analysis */
+#job-description-section {
     text-align: center;
-    margin-top: 4rem;
+}
+
+#job-description-section h2 {
+    font-size: 2.2rem;
+    margin-bottom: 1rem;
+    color: #2c3e50;
+}
+
+.job-data-item {
+    margin-bottom: 1rem;
+}
+
+.job-data-item strong {
+    display: block;
+    color: #4a90e2;
+    margin-bottom: 0.25rem;
+}
+
+.skills-section {
+    margin-bottom: 1.5rem;
+}
+
+.skills-section h5 {
+    margin-bottom: 0.5rem;
+    color: #2c3e50;
+}
+
+.skill-tag {
+    display: inline-block;
+    padding: 0.4rem 0.8rem;
+    margin: 0.3rem;
+    border-radius: 4px;
+    font-size: 0.9rem;
+}
+
+.skill-tag.required {
+    background-color: #e3f2fd;
+    border: 1px solid #bbdefb;
+    color: #1976d2;
+}
+
+.skill-tag.nice-to-have {
+    background-color: #f5f5f5;
+    border: 1px solid #e0e0e0;
+    color: #616161;
+}
+
+.skill-tag.matched {
+    background-color: #e8f5e9;
+    border: 1px solid #c8e6c9;
+    color: #388e3c;
+}
+
+.skill-tag.missing {
+    background-color: #ffebee;
+    border: 1px solid #ffcdd2;
+    color: #d32f2f;
+}
+
+.job-match-section {
+    margin-top: 2rem;
+    text-align: left;
+    padding: 1.5rem;
+    background-color: #f9f9f9;
+    border-radius: 8px;
+}
+
+.job-match-actions {
+    margin: 1rem 0;
+}
+
+#match-resume-status {
+    margin-left: 1rem;
+    font-style: italic;
+    color: #7f8c8d;
+}
+
+.match-result {
+    margin-top: 1.5rem;
+    padding: 1.5rem;
+    border-radius: 8px;
+    background-color: white;
+    box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+}
+
+.match-result.excellent {
+    border-left: 5px solid #2ecc71;
+}
+
+.match-result.good {
+    border-left: 5px solid #3498db;
+}
+
+.match-result.moderate {
+    border-left: 5px solid #f39c12;
+}
+
+.match-result.weak {
+    border-left: 5px solid #e74c3c;
+}
+
+.match-score {
+    display: flex;
+    align-items: center;
+    margin: 1rem 0;
+}
+
+.score-value {
+    font-size: 2.5rem;
+    font-weight: bold;
+    margin-right: 1rem;
+}
+
+.match-result.excellent .score-value {
+    color: #2ecc71;
+}
+
+.match-result.good .score-value {
+    color: #3498db;
+}
+
+.match-result.moderate .score-value {
+    color: #f39c12;
+}
+
+.match-result.weak .score-value {
+    color: #e74c3c;
+}
+
+.score-label {
+    font-size: 1.2rem;
+    color: #7f8c8d;
+}
+
+.match-details {
+    margin-top: 1.5rem;
+}
+
+.matched-skills, .missing-skills {
+    margin-bottom: 1.5rem;
+}
+
+.recommendations ul {
+    margin: 0.5rem 0 0 1.5rem;
+}
+
+.recommendations li {
+    margin-bottom: 0.5rem;
 }
 
 /* Media Queries */
 @media screen and (max-width: 768px) {
-    header .container {
-        flex-direction: column;
-        text-align: center;
-    }
-
-    header nav ul {
-        margin-top: 1rem;
-    }
-
-    header nav ul li {
-        margin: 0 0.5rem;
-    }
-
-    .progress-bar {
-        display: none;
-    }
-
-    .form-buttons {
-        flex-direction: column;
-        gap: 1rem;
-    }
-
-    .form-buttons button {
-        width: 100%;
-    }
-
-    .preview-actions {
-        flex-direction: column;
-    }
-
-    .preview-actions button {
-        width: 100%;
+    .results-container {
+        grid-template-columns: 1fr;
     }
 }
