@@ -1,3 +1,6 @@
 streamlit
 PyPDF2
 python-docx
+streamlit-antd-components
+streamlit-lottie
+streamlit-extras
