@@ -14,7 +14,17 @@ import io # For PDF in-memory buffer
 # Set page config - Using "wide" layout and a dark theme by default from Streamlit's options
 st.set_page_config(layout="wide", page_title="AI Resume Toolkit", initial_sidebar_state="expanded")
 
-# Custom CSS for modern look and feel
+# --- GSAP Library (Load Once) ---
+# Using a more recent version of GSAP if available, ensure it's a valid CDN link.
+# The example used 3.12.2. If newer, like 3.12.5, use that.
+# For stability in this environment, I'll stick to a known version.
+st.markdown("""
+<script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.2/gsap.min.js"></script>
+""", unsafe_allow_html=True)
+
+
+# --- Custom CSS ---
+# (No changes to CSS content itself in this step, just ensuring GSAP is loaded before it)
 custom_css = """
 <style>
     /* Base theme colors - Dark */
@@ -238,10 +248,17 @@ if page == "Resume Analyzer":
             # Animate the display of parsed data (simple fade-in using CSS)
             # To do this properly with individual elements, each would need to be wrapped.
             # For now, wrapping the whole results section.
-            st.markdown("<div class='fade-in'>", unsafe_allow_html=True)
+            # The fade-in class is a generic CSS animation. GSAP will be used for card-specific staggers.
+            st.markdown("<div class='fade-in' id='resume_results_container'>", unsafe_allow_html=True)
 
             parsed_data = parse_resume_text(text)
             st.session_state.resume_analysis_results = parsed_data # Store in session state
+
+            # Check if parsing yielded minimal results and show a warning if so
+            if parsed_data.get("name", "N/A") == "N/A" and \
+               (not parsed_data.get("skills") or parsed_data.get("skills") == ["N/A"]) and \
+               (not parsed_data.get("experience") or not any(e.get('job_title') != "N/A" for e in parsed_data.get("experience",[]))):
+                st.warning("Parsing was limited. The resume might be a scanned image, empty, or in an unusual format. Please check the content if results are not as expected.")
 
             # Displaying Parsed Information with enhanced styling
             st.subheader("Parsed Resume Information:")
@@ -288,10 +305,12 @@ if page == "Resume Analyzer":
 
             # Education Section
             st.markdown("<h4 class='custom-h4'><span class='icon'>🎓</span>Education</h4>", unsafe_allow_html=True)
+            st.markdown("<div id='education_cards_container'>", unsafe_allow_html=True) # GSAP Target Wrapper
             if parsed_data.get("education"):
-                for edu_entry in parsed_data["education"]:
-                    if edu_entry.get('institution') != "N/A": # Basic check if entry is not just placeholder
+                for i, edu_entry in enumerate(parsed_data["education"]): # Added index for unique keys if needed later
+                    if edu_entry.get('institution') != "N/A":
                         with st.container():
+                            # Each card could have a more unique class if needed: class='info-card education-card'
                             st.markdown(f"<div class='info-card'>", unsafe_allow_html=True)
                             if edu_entry.get('degree') and edu_entry.get('degree') != "N/A":
                                 st.markdown(f"<strong>{edu_entry['degree']}</strong>", unsafe_allow_html=True)
@@ -300,19 +319,34 @@ if page == "Resume Analyzer":
                             if edu_entry.get('date') and edu_entry.get('date') != "N/A":
                                 st.markdown(f"<p><span class='icon'>📅</span>Date: {edu_entry['date']}</p>", unsafe_allow_html=True)
                             st.markdown(f"</div>", unsafe_allow_html=True)
-                        add_vertical_space(1)
-                    elif len(parsed_data["education"]) == 1 : # Only one entry and it's a placeholder
+                        add_vertical_space(1) # This spacer might interfere with clean stagger if not part of the card itself
+                    elif len(parsed_data["education"]) == 1 :
                          st.markdown("<p><em>(No specific education details extracted or provided in a parsable format.)</em></p>", unsafe_allow_html=True)
             else:
                 st.markdown("<p><em>(No education details extracted)</em></p>", unsafe_allow_html=True)
-
+            st.markdown("</div>", unsafe_allow_html=True) # End education_cards_container
+            st.markdown("""
+            <script>
+                // Ensure GSAP is loaded before running this
+                if (typeof gsap !== 'undefined') {
+                    gsap.from("#education_cards_container .info-card", {
+                        duration: 0.5,
+                        autoAlpha: 0, // handles opacity and visibility
+                        y: 50,
+                        stagger: 0.2,
+                        ease: "power2.out"
+                    });
+                }
+            </script>
+            """, unsafe_allow_html=True)
             add_vertical_space(1)
 
             # Experience Section
             st.markdown("<h4 class='custom-h4'><span class='icon'>👔</span>Experience</h4>", unsafe_allow_html=True)
+            st.markdown("<div id='experience_cards_container'>", unsafe_allow_html=True) # GSAP Target Wrapper
             if parsed_data.get("experience"):
-                for exp_entry in parsed_data["experience"]:
-                    if exp_entry.get('company') != "N/A": # Basic check if entry is not just placeholder
+                for i, exp_entry in enumerate(parsed_data["experience"]): # Added index
+                    if exp_entry.get('company') != "N/A":
                         with st.container():
                             st.markdown(f"<div class='info-card'>", unsafe_allow_html=True)
                             if exp_entry.get('job_title') and exp_entry.get('job_title') != "N/A":
@@ -322,19 +356,32 @@ if page == "Resume Analyzer":
                             if exp_entry.get('date_range') and exp_entry.get('date_range') != "N/A":
                                 st.markdown(f"<p><span class='icon'>📅</span>Dates: {exp_entry['date_range']}</p>", unsafe_allow_html=True)
                             if exp_entry.get('description') and exp_entry.get('description') != "N/A":
-                                # Display description as markdown to render bullet points etc.
                                 st.markdown(f"<div><strong>Responsibilities:</strong><br>{exp_entry['description']}</div>", unsafe_allow_html=True)
                             st.markdown(f"</div>", unsafe_allow_html=True)
-                        add_vertical_space(1)
-                    elif len(parsed_data["experience"]) == 1: # Only one entry and it's a placeholder
+                        add_vertical_space(1) # Spacer might affect stagger visuals
+                    elif len(parsed_data["experience"]) == 1:
                         st.markdown("<p><em>(No specific work experience details extracted or provided in a parsable format.)</em></p>", unsafe_allow_html=True)
             else:
                 st.markdown("<p><em>(No work experience details extracted)</em></p>", unsafe_allow_html=True)
+            st.markdown("</div>", unsafe_allow_html=True) # End experience_cards_container
+            st.markdown("""
+            <script>
+                if (typeof gsap !== 'undefined') {
+                    gsap.from("#experience_cards_container .info-card", {
+                        duration: 0.5,
+                        autoAlpha: 0,
+                        y: 50,
+                        stagger: 0.2,
+                        ease: "power2.out"
+                    });
+                }
+            </script>
+            """, unsafe_allow_html=True)
 
-            st.markdown("</div>", unsafe_allow_html=True) # End of fade-in div
+            st.markdown("</div>", unsafe_allow_html=True) # End of main fade-in results_container (if used) or general fade-in.
 
         else:
-            st.error("Could not extract text from the uploaded file.")
+            st.error("Could not extract text from the uploaded file. Please ensure it's a valid PDF or DOCX.")
 
 elif page == "Job Analyzer":
     st.header("Job Analyzer")
@@ -425,11 +472,17 @@ elif page == "Job Analyzer":
         #           type='info', icon=True)
 
         # --- Resume Match Analysis Implementation ---
+        # Ensure this container is only added if there are results to show, to prevent empty div with GSAP target
+        if 'resume_analysis_results' in st.session_state and st.session_state.resume_analysis_results and \
+           st.session_state.job_analysis_results.get('skills') and \
+           st.session_state.job_analysis_results['skills'] != ["N/A"]:
+            st.markdown("<div id='skill_match_cards_container'>", unsafe_allow_html=True) # GSAP Target Wrapper
+
         st.markdown("<h4 class='custom-h4' style='color: #FFA500;'><span class='icon'>🎯</span>Resume Match Analysis</h4>", unsafe_allow_html=True)
 
-        if 'resume_analysis_results' not in st.session_state or not st.session_state.resume_analysis_results:
+        if 'resume_analysis_results' not in st.session_state or not st.session_state.get('resume_analysis_results'): # Check .get for safety
             sac.alert(label='Resume Not Analyzed',
-                      description='Please analyze your resume first in the "Resume Analyzer" tab to see the match results.',
+                      description='Please analyze your resume first in the "Resume Analyzer" tab to see the match results, then re-analyze the job description.',
                       type='warning', icon=True)
         else:
             resume_skills_raw = st.session_state.resume_analysis_results.get('skills', [])
@@ -455,30 +508,67 @@ elif page == "Job Analyzer":
                 sac.progress(value=int(match_score), color='green', size='lg', striped=True)
                 add_vertical_space(1)
 
+                # These will be animated as blocks
                 if matching_skills:
-                    st.markdown("<strong><span class='icon'>✅</span>Matching Skills:</strong>", unsafe_allow_html=True)
+                    st.markdown("<div class='skill-match-block'><strong><span class='icon'>✅</span>Matching Skills:</strong>", unsafe_allow_html=True)
                     sac.tags([sac.Tag(label=skill.capitalize(), color='green', bordered=False) for skill in matching_skills],
                              format_func=None, align='start', size='sm')
+                    st.markdown("</div>", unsafe_allow_html=True)
                 else:
-                    st.markdown("<strong><span class='icon'>✅</span>Matching Skills:</strong> <p><em>No direct skill matches found.</em></p>", unsafe_allow_html=True)
+                    st.markdown("<div class='skill-match-block'><strong><span class='icon'>✅</span>Matching Skills:</strong> <p><em>No direct skill matches found.</em></p></div>", unsafe_allow_html=True)
                 add_vertical_space(1)
 
                 if missing_skills:
-                    st.markdown("<strong><span class='icon'>❌</span>Missing Skills (Job requirements not in your resume):</strong>", unsafe_allow_html=True)
+                    st.markdown("<div class='skill-match-block'><strong><span class='icon'>❌</span>Missing Skills (Job requirements not in your resume):</strong>", unsafe_allow_html=True)
                     sac.tags([sac.Tag(label=skill.capitalize(), color='red', bordered=False) for skill in missing_skills],
                              format_func=None, align='start', size='sm')
+                    st.markdown("</div>", unsafe_allow_html=True)
                 else:
-                    st.markdown("<strong><span class='icon'>❌</span>Missing Skills:</strong> <p><em>Your resume appears to cover all skills listed in the job description!</em></p>", unsafe_allow_html=True)
+                    st.markdown("<div class='skill-match-block'><strong><span class='icon'>❌</span>Missing Skills:</strong> <p><em>Your resume appears to cover all skills listed in the job description!</em></p></div>", unsafe_allow_html=True)
                 add_vertical_space(1)
 
                 if additional_skills_in_resume:
-                    st.markdown("<strong><span class='icon'>➕</span>Additional Skills (In your resume, not in job description):</strong>", unsafe_allow_html=True)
+                    st.markdown("<div class='skill-match-block'><strong><span class='icon'>➕</span>Additional Skills (In your resume, not in job description):</strong>", unsafe_allow_html=True)
                     sac.tags([sac.Tag(label=skill.capitalize(), color='geekblue', bordered=False) for skill in additional_skills_in_resume],
                              format_func=None, align='start', size='sm')
-                # else:
-                #     st.markdown("<strong><span class='icon'>➕</span>Additional Skills:</strong> <p><em>No additional skills noted in resume compared to job description.</em></p>", unsafe_allow_html=True)
+                    st.markdown("</div>", unsafe_allow_html=True)
+                # else: (No message if no additional skills, to keep UI cleaner)
 
-                # Further analysis could be added here (e.g., experience level comparison)
+        # Close the skill_match_cards_container div only if it was opened
+        if 'resume_analysis_results' in st.session_state and st.session_state.resume_analysis_results and \
+           st.session_state.job_analysis_results.get('skills') and \
+           st.session_state.job_analysis_results['skills'] != ["N/A"]:
+            st.markdown("</div>", unsafe_allow_html=True) # End skill_match_cards_container
+            st.markdown("""
+            <script>
+    if (typeof gsap !== 'undefined') {
+        // Delay slightly to ensure elements are in DOM from Streamlit's rendering pass
+        setTimeout(function() {
+            gsap.from("#skill_match_cards_container .skill-match-block", {
+                duration: 0.5,
+                autoAlpha: 0,
+                y: 30,
+                stagger: 0.15,
+                ease: "power2.out"
+            });
+        }, 100); // 100ms delay, adjust if needed
+    }
+</script>
+            """, unsafe_allow_html=True)
+            if (typeof gsap !== 'undefined') {
+                // Delay slightly to ensure elements are in DOM from Streamlit's rendering pass
+                setTimeout(function() {
+                    gsap.from("#skill_match_cards_container .skill-match-block", {
+                        duration: 0.5,
+                        autoAlpha: 0,
+                        y: 30,
+                        stagger: 0.15,
+                        ease: "power2.out"
+                    });
+                }, 100); // 100ms delay, adjust if needed
+            }
+        </script>
+        """, unsafe_allow_html=True)
 
 
 elif page == "Resume Builder":
@@ -663,30 +753,58 @@ elif page == "Resume Builder":
 
     elif current_step_index == 4: # Skills
         st.markdown("<h4 class='custom-h4'>Skills</h4>", unsafe_allow_html=True)
-        st.markdown("<small>Enter skills separated by commas, or select from suggestions below.</small>", unsafe_allow_html=True)
+        st.markdown(
+            "<small>Enter skills separated by commas in the text box below. "
+            "You can also select from the suggestions; use the 'Update Skills List from Suggestions' button to add them to your list. "
+            "To remove skills, please edit the text box directly.</small>",
+            unsafe_allow_html=True
+        )
+        add_vertical_space(1)
 
         # Convert list of skills to comma-separated string for text_area
         skills_str = ", ".join(st.session_state.rb_skills)
-        updated_skills_str = st.text_area("Your Skills", value=skills_str, key="rb_skills_text_area", height=100)
-        # Update session state list from the text_area string
-        st.session_state.rb_skills = [skill.strip() for skill in updated_skills_str.split(',') if skill.strip()]
+        updated_skills_str = st.text_area("Your Skills (comma-separated)", value=skills_str, key="rb_skills_text_area", height=100)
+
+        current_skill_list_from_text_area = sorted(list(set([skill.strip() for skill in updated_skills_str.split(',') if skill.strip()])))
+
+        # Only update and rerun if the list actually changed to prevent excessive reruns on typing
+        if current_skill_list_from_text_area != sorted(list(set(st.session_state.rb_skills))):
+             st.session_state.rb_skills = current_skill_list_from_text_area
+             # No rerun here, text area naturally updates session state on next interaction elsewhere or button press
 
         if common_skills_options:
-            st.markdown("<strong>Skill Suggestions:</strong>", unsafe_allow_html=True)
+            st.markdown("<strong>Skill Suggestions (select to add):</strong>", unsafe_allow_html=True)
+            # Store selections from multiselects temporarily before adding them
+            skills_to_add_from_suggestions = set()
+
             for category, skills_list in common_skills_options.items():
                 with st.expander(category):
-                    selected_cat_skills = st.multiselect(f"Select {category.lower()} skills", options=skills_list,
-                                                         default=[s for s in skills_list if s in st.session_state.rb_skills], # Pre-select if already in main list
-                                                         key=f"rb_cat_skills_{category.replace(' ', '_')}")
-                    # Add newly selected skills to the main list, avoid duplicates
+                    # The default for multiselect should reflect what's ALREADY in rb_skills *that belongs to this category*
+                    default_selection = [s for s in skills_list if s in st.session_state.rb_skills]
+                    selected_cat_skills = st.multiselect(
+                        f"Select {category.lower()} skills",
+                        options=skills_list,
+                        default=default_selection,
+                        key=f"rb_cat_skills_{category.replace(' ', '_')}"
+                    )
                     for skill in selected_cat_skills:
-                        if skill not in st.session_state.rb_skills:
-                            st.session_state.rb_skills.append(skill)
-                    # This part is a bit tricky with multiselect; if a user deselects, it won't remove from rb_skills directly.
-                    # A more robust way would be to reconstruct rb_skills based on all multiselects + text area.
-                    # For now, it primarily adds. User can manually remove from text area.
-            if st.button("Update Skills from Suggestions", key="update_skills_btn"):
-                 st.rerun() # Rerun to update the text_area with newly added skills
+                        skills_to_add_from_suggestions.add(skill)
+
+            if st.button("Add Selected Suggestions to Skills List", key="update_skills_btn"):
+                newly_added_count = 0
+                for skill_to_add in skills_to_add_from_suggestions:
+                    if skill_to_add not in st.session_state.rb_skills:
+                        st.session_state.rb_skills.append(skill_to_add)
+                        newly_added_count +=1
+
+                # Sort and remove duplicates after adding
+                st.session_state.rb_skills = sorted(list(set(st.session_state.rb_skills)))
+
+                if newly_added_count > 0:
+                    st.toast(f"{newly_added_count} skill(s) added to your list!", icon="✨")
+                else:
+                    st.toast("No new skills were added from suggestions.", icon="🤷")
+                st.rerun() # Rerun to update the text_area with newly added/consolidated skills
 
     elif current_step_index == 5: # Projects
         st.markdown("<h4 class='custom-h4'>Projects</h4>", unsafe_allow_html=True)
@@ -731,13 +849,69 @@ elif page == "Resume Builder":
         st.markdown("<h4 class='custom-h4'>Review & Download Your Resume</h4>", unsafe_allow_html=True)
         add_vertical_space(1)
 
-        # Consolidate all resume data from session state
-        resume_data_for_pdf = {
-            key: st.session_state[key] for key in st.session_state if key.startswith('rb_')
-        }
+        # --- Display Three.js decorative element ---
+        if 'threejs_scene_html_content' not in st.session_state:
+            try:
+                with open("threejs_scene.html", "r") as f:
+                    st.session_state.threejs_scene_html_content = f.read()
+            except FileNotFoundError:
+                st.session_state.threejs_scene_html_content = "<p style='color:orange;'>Three.js scene HTML file not found.</p>"
 
-        # Display a summary for review (optional, could be more detailed)
-        st.markdown("<h5>Quick Review:</h5>", unsafe_allow_html=True)
+        review_cols_main = st.columns([2,1]) # Give more space to review, less to 3D
+        with review_cols_main[0]:
+            # Consolidate all resume data from session state
+            resume_data_for_pdf = {
+                key: st.session_state[key] for key in st.session_state if key.startswith('rb_')
+            }
+
+            st.markdown("<h5>Quick Review:</h5>", unsafe_allow_html=True)
+            # Display a summary for review (optional, could be more detailed)
+            # review_cols = st.columns(2) # Nested columns might be too much
+            # with review_cols[0]:
+            st.markdown(f"**Name:** {st.session_state.get('rb_name', 'N/A')}")
+            st.markdown(f"**Email:** {st.session_state.get('rb_email', 'N/A')}")
+            st.markdown(f"**Phone:** {st.session_state.get('rb_phone', 'N/A')}")
+            # with review_cols[1]:
+            st.markdown(f"**Experience Entries:** {len(st.session_state.get('rb_experience', []))}")
+            st.markdown(f"**Education Entries:** {len(st.session_state.get('rb_education', []))}")
+            st.markdown(f"**Skills:** {', '.join(st.session_state.get('rb_skills', ['N/A']))[:70]}...")
+
+            add_vertical_space(2)
+
+            # Template Selection
+            template_options = list(pdf_templates.TEMPLATE_FUNCTIONS.keys())
+            selected_template = st.selectbox("Choose a Resume Template:", template_options, key="rb_template_select")
+
+            # PDF Generation and Download
+            if st.button("Generate & Download PDF 📄", key="rb_generate_download_pdf", type="primary"):
+                if selected_template and selected_template in pdf_templates.TEMPLATE_FUNCTIONS:
+                    pdf_function = pdf_templates.TEMPLATE_FUNCTIONS[selected_template]
+                    try:
+                        with st.spinner(f"Generating PDF with '{selected_template}' template..."):
+                            pdf_buffer = pdf_function(resume_data_for_pdf)
+
+                        st.download_button(
+                            label="📥 Download PDF",
+                            data=pdf_buffer,
+                            file_name=f"{st.session_state.get('rb_name', 'resume').replace(' ', '_')}_{selected_template.lower().replace(' ', '_')}.pdf",
+                            mime="application/pdf",
+                            key="rb_pdf_download_final"
+                        )
+                        st.success("PDF generated successfully! Click download if it didn't start automatically.")
+                    except Exception as e:
+                        st.error(f"Error generating PDF: {e}")
+                        print(f"PDF Generation Error: {e}")
+                else:
+                    st.warning("Please select a valid template.")
+
+        with review_cols_main[1]:
+            if st.session_state.threejs_scene_html_content and not st.session_state.threejs_scene_html_content.startswith("<p style='color:orange;'>"):
+                 st.components.v1.html(st.session_state.threejs_scene_html_content, height=300, width=250) # Adjust size as needed
+            else:
+                 st.markdown(st.session_state.threejs_scene_html_content, unsafe_allow_html=True) # Show error if file not found
+
+        add_vertical_space(1)
+        st.markdown("<h6>Full Data (for debugging):</h6>", unsafe_allow_html=True)
         review_cols = st.columns(2)
         with review_cols[0]:
             st.markdown(f"**Name:** {st.session_state.get('rb_name', 'N/A')}")

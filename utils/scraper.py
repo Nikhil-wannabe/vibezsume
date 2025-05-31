@@ -1,116 +1,165 @@
 import requests
-from bs4 import BeautifulSoup
+from bs4 import BeautifulSoup, Comment # Import Comment to remove comments
 import re
+
+# Pre-compiled regex for cleaning
+SHARE_APPLY_PATTERN = re.compile(r'\b(share this job|apply now|report this job)\b', re.IGNORECASE)
+MULTIPLE_NEWLINES_PATTERN = re.compile(r'\n\s*\n+') # Matches 2 or more newlines with optional space between
+
+# Common selectors for job descriptions (can be expanded)
+# Order matters: more specific or common ones should be tried first.
+POTENTIAL_SELECTORS = [
+    {'class_': re.compile(r'job-description|job_description|jobDescription|jobdescript(ion)?|posting-content|job-details-content')},
+    {'class_': re.compile(r'job-details|job_details|jobDetails|jobdetail|job-listing-details')},
+    {'id': re.compile(r'job-description|job_description|jobDescription|job-details')},
+    {'tag': 'article'},
+    {'tag': 'main'},
+    {'tag': 'div', 'class_': re.compile(r'content|main-content|job-content|description|jobAdDetails|jobSummary')},
+    # Add more specific selectors for known job boards if necessary, e.g.:
+    # {'class_': 'jobsearch-JobComponent-description'}, # Indeed (example, might change)
+    # {'class_': 'description__text'}, # LinkedIn (example, might change, often JS rendered)
+]
+
+JOB_KEYWORDS = ['responsibilities', 'qualifications', 'duties', 'experience', 'requirements', 'skills', 'benefits', 'salary']
+
+
+def _clean_text(text: str) -> str:
+    """Helper function to perform basic text cleaning."""
+    if not text:
+        return ""
+    text = SHARE_APPLY_PATTERN.sub('', text) # Remove "share this job", "apply now" etc.
+    text = MULTIPLE_NEWLINES_PATTERN.sub('\n\n', text) # Consolidate multiple newlines to a double newline
+    return text.strip()
 
 def scrape_job_posting(url: str) -> str:
     """
-    Fetches content from a URL and extracts the main job description text.
-    Uses heuristics to find the relevant content.
+    Fetches content from a URL and extracts the main job description text using heuristics.
+
+    Args:
+        url: The URL of the job posting.
+
+    Returns:
+        The extracted and cleaned job description text, or an error message string.
     """
-    if not url.startswith(('http://', 'https://')):
-        url = 'https://' + url # Basic scheme check
+    if not (url.startswith('http://') or url.startswith('https://')):
+        url = 'https://' + url # Add scheme if missing
 
     try:
         headers = {
-            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36'
+            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36',
+            'Accept-Language': 'en-US,en;q=0.9',
+            'Accept-Encoding': 'gzip, deflate, br', # Added to handle compressed content
+            'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,image/apng,*/*;q=0.8',
+            'Connection': 'keep-alive',
+            'DNT': '1', # Do Not Track
+            'Upgrade-Insecure-Requests': '1'
         }
-        response = requests.get(url, headers=headers, timeout=10)
-        response.raise_for_status()  # Raise an exception for bad status codes (4xx or 5xx)
-    except requests.exceptions.RequestException as e:
+        response = requests.get(url, headers=headers, timeout=15) # Increased timeout
+        response.raise_for_status()  # Raise HTTPError for bad responses (4xx or 5xx)
+
+    except requests.exceptions.Timeout:
+        return f"Error fetching URL: Timeout after 15 seconds for {url}"
+    except requests.exceptions.HTTPError as e:
+        return f"Error fetching URL: HTTP Error {e.response.status_code} for {url}"
+    except requests.exceptions.ConnectionError:
+        return f"Error fetching URL: Connection error for {url}. Check network or hostname."
+    except requests.exceptions.RequestException as e: # Catch-all for other requests errors
         return f"Error fetching URL: {e}"
 
-    soup = BeautifulSoup(response.content, 'html.parser')
+    try:
+        soup = BeautifulSoup(response.content, 'html.parser')
 
-    # Heuristics to find the main job description content
-    # These selectors are common but might need adjustment for specific sites.
-    potential_selectors = [
-        {'tag': 'article'},
-        {'tag': 'main'},
-        {'class_': re.compile(r'job-description|job_description|jobDescription|jobdescript')},
-        {'class_': re.compile(r'job-details|job_details|jobDetails|jobdetail')},
-        {'id': re.compile(r'job-description|job_description|jobDescription')},
-        {'tag': 'div', 'class_': re.compile(r'content|main-content|job-content|description')},
-        # Add more specific selectors if known for common job boards
-        # e.g. for LinkedIn: {'class_': 'description__text'} (but this changes)
-    ]
+        # Remove script, style, nav, header, footer, and comment tags as they usually don't contain main content
+        for unwanted_tag in soup(['script', 'style', 'nav', 'header', 'footer', 'aside', 'form', 'noscript']):
+            unwanted_tag.decompose()
+        for comment in soup.find_all(string=lambda text: isinstance(text, Comment)):
+            comment.extract()
+
+    except Exception as e: # Catch errors during initial soup processing
+        return f"Error parsing HTML content: {e}"
+
 
     extracted_text = ""
-    for selector_method in potential_selectors:
-        if 'tag' in selector_method and 'class_' not in selector_method and 'id' not in selector_method:
-            elements = soup.find_all(selector_method['tag'])
-        elif 'class_' in selector_method:
-            elements = soup.find_all(selector_method.get('tag', True), class_=selector_method['class_'])
-        elif 'id' in selector_method:
-            elements = soup.find_all(selector_method.get('tag', True), id=selector_method['id'])
-        else:
-            elements = []
+    # Try heuristic selectors
+    for selector_method in POTENTIAL_SELECTORS:
+        try:
+            if 'tag' in selector_method and 'class_' not in selector_method and 'id' not in selector_method:
+                elements = soup.find_all(selector_method['tag'])
+            elif 'class_' in selector_method:
+                elements = soup.find_all(selector_method.get('tag', True), class_=selector_method['class_'])
+            elif 'id' in selector_method:
+                elements = soup.find_all(selector_method.get('tag', True), id=selector_method['id'])
+            else:
+                continue # Invalid selector definition
+        except Exception as e: # Catch errors if a selector is malformed (e.g. bad regex in re.compile)
+            print(f"Scraper warning: Malformed selector {selector_method} - {e}")
+            continue
 
         if elements:
-            # Prioritize elements with more text, but be wary of a parent containing too much (like whole page)
-            best_element = None
+            best_element_text = ""
             max_len = 0
+            # Iterate through found elements to find the one with the most relevant text
             for element in elements:
                 current_text = element.get_text(separator='\n', strip=True)
-                if len(current_text) > max_len and len(current_text) < 0.8 * len(soup.get_text()): # Avoid capturing the whole page
-                    # Check for common job description keywords to increase confidence
-                    if any(kw in current_text.lower() for kw in ['responsibilities', 'qualifications', 'duties', 'experience', 'requirements']):
-                        max_len = len(current_text)
-                        best_element = element
+                # Heuristic: check length and presence of job-related keywords
+                # The length check (not too short, not the entire page) helps filter noise.
+                if 200 < len(current_text) < (0.9 * len(soup.get_text()) if soup.get_text() else float('inf')):
+                    if any(keyword in current_text.lower() for keyword in JOB_KEYWORDS):
+                        if len(current_text) > max_len:
+                            max_len = len(current_text)
+                            best_element_text = current_text
 
-            if best_element:
-                extracted_text = best_element.get_text(separator='\n', strip=True)
-                # Further clean up: remove "share" buttons, "apply" links if they are text noise
-                extracted_text = re.sub(r'\b(share this job|apply now|report this job)\b', '', extracted_text, flags=re.IGNORECASE)
-                extracted_text = re.sub(r'\n\s*\n', '\n', extracted_text) # Consolidate multiple newlines
-                break # Stop after the first successful heuristic match that yields good content
+            if best_element_text:
+                extracted_text = best_element_text
+                break # Found a good candidate, stop searching
 
     if not extracted_text:
-        # Fallback: try to get all text from body, but this can be very noisy
-        body_text = soup.body.get_text(separator='\n', strip=True) if soup.body else "Could not find body content."
-        # Basic cleaning for fallback
-        body_text = re.sub(r'\s*\n\s*', '\n', body_text) # Consolidate multiple newlines
-        # Try to filter for a reasonable chunk of text - very heuristic
-        # Look for a block of text that seems paragraph-like
-        paragraphs = body_text.split('\n\n')
-        longest_paragraph_block = ""
-        current_max_len = 0
-        for p_block in paragraphs:
-            if len(p_block) > 300 and len(p_block) > current_max_len: # Arbitrary length check
-                 if any(kw in p_block.lower() for kw in ['responsibilities', 'qualifications', 'duties', 'experience', 'requirements']):
-                    current_max_len = len(p_block)
-                    longest_paragraph_block = p_block
+        # Fallback: get all text from body if specific selectors fail
+        if soup.body:
+            body_text = soup.body.get_text(separator='\n', strip=True)
+            # Attempt a very basic content distillation if body_text is too long/noisy
+            if len(body_text) > 5000: # Arbitrary threshold for "too noisy"
+                meaningful_blocks = []
+                for para_text in body_text.split('\n\n'): # Split by double newlines
+                    if len(para_text) > 150 and any(keyword in para_text.lower() for keyword in JOB_KEYWORDS):
+                        meaningful_blocks.append(para_text)
+                if meaningful_blocks:
+                    extracted_text = "\n\n".join(meaningful_blocks)
+                else: # If no meaningful blocks, take first N chars of body, or just give up
+                    extracted_text = body_text[:3000] + "..." # Truncate very long fallbacks
+            elif body_text: # Body text is not excessively long
+                 extracted_text = body_text
+            else: # No body text found
+                 return "Could not automatically extract the main job description. No content found in body."
+        else:
+            return "Could not automatically extract the main job description. HTML structure might be unusual or empty."
 
-        if longest_paragraph_block:
-            extracted_text = longest_paragraph_block
-        else: # If still nothing good, return a message
-            return "Could not automatically extract the main job description. The website structure might be too complex or unsupported. Try pasting the text directly."
+    cleaned_text = _clean_text(extracted_text)
+    if not cleaned_text or len(cleaned_text) < 100 : # If after cleaning, text is too short
+        return "Could not extract sufficient job description content. Try pasting the text directly."
 
-
-    return extracted_text.strip()
+    return cleaned_text
 
 if __name__ == '__main__':
-    # Test URLs (these might become outdated or blocked)
     test_urls = [
-        "https://www.linkedin.com/jobs/view/software-engineer-at-linkedin-1234567890", # Example, likely won't work directly due to JS/login
-        "https://www.indeed.com/viewjob?jk=somejobkey", # Example
-        "https://careers.google.com/jobs/results/some-id/", # Example
-        "https://example.com/careers/job-posting-123" # A generic example
+        # Replace with actual, currently accessible job posting URLs for real testing
+        # "https://www.example.com/job1",
+        # "https://www.anotherjobsite.com/postingXYZ"
     ]
 
-    # A more realistic test would be with a known, simple HTML structure saved locally or a live URL known to be accessible.
-    # For now, this is a placeholder for testing.
-    # print(f"Testing with a placeholder URL (will likely fail if not a real, accessible job posting): {test_urls[3]}")
-    # result = scrape_job_posting(test_urls[3])
-    # print("\n--- Scraped Text ---")
-    # print(result[:1000] + "..." if result else "No text extracted.")
+    if not test_urls:
+        print("No test URLs provided in __main__ block. Scraper testing skipped.")
 
-    # Test with a non-existent or problematic URL
-    # print("\n--- Testing with a bad URL ---")
-    # result_bad = scrape_job_posting("http://thisurldoesnotexistandshouldfail.com")
-    # print(result_bad)
+    for i, url_to_test in enumerate(test_urls):
+        print(f"\n--- Testing URL {i+1}: {url_to_test} ---")
+        result = scrape_job_posting(url_to_test)
+        print(f"Result (first 500 chars):\n{result[:500]}{'...' if len(result) > 500 else ''}")
 
-    # Test with a non-HTTP URL
-    # print("\n--- Testing with a non-HTTP URL ---")
-    # result_non_http = scrape_job_posting("notaurl")
-    # print(result_non_http)
+    print("\n--- Testing with a known bad URL ---")
+    result_bad = scrape_job_posting("http://thisurldoesnotexistandshouldfail123abc.com")
+    print(result_bad)
+
+    print("\n--- Testing with a non-HTTP URL ---")
+    result_non_http = scrape_job_posting("notaurl")
+    print(result_non_http)
     pass
