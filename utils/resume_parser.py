@@ -3,412 +3,389 @@ import docx
 import re
 import spacy
 from spacy.matcher import Matcher
+from typing import List, Dict, Optional, Any # For type hinting
 
 # --- Constants and Pre-compiled Regex ---
-# It's good practice to define constants for regex patterns, especially if complex.
-# Compiling regex patterns that are used multiple times can improve performance.
+# Using re.IGNORECASE for most patterns to simplify variations in section headers etc.
 EMAIL_PATTERN = re.compile(r"[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}")
-PHONE_PATTERN = re.compile(r"(\(?\d{3}\)?[\s.-]?)?\d{3}[\s.-]?\d{4}") # More comprehensive
-SKILL_SECTION_PATTERN = re.compile(
-    r"(skills|technical skills|proficiencies|technologies|technical proficiencies)[\s:]*\n((?:[ \t]*(?:[\w\s,+#./()&'-]+)(?:\n|$))+)",
-    re.IGNORECASE
-)
+PHONE_PATTERN = re.compile(r"(\(?\d{3}\)?[\s.-]?)?\d{3}[\s.-]?\d{4}")
+# SKILL_SECTION_PATTERN: Used within parse_skills, kept local there for now if SKILLS_LIST changes.
 EDUCATION_SECTION_PATTERN = re.compile(
-    r"(education|academic background|qualifications)[\s:]*\n((?:.|\n)+?)(?=\n(?:experience|skills|projects|awards|publications|references|technical skills)|$)",
-    re.IGNORECASE
+    r"\n\s*(Education|Academic Background|Qualifications)\s*[:\n]", re.IGNORECASE
 )
 EXPERIENCE_SECTION_PATTERN = re.compile(
-    r"(experience|work experience|professional experience|employment history)[\s:]*\n((?:.|\n)+?)(?=\n(?:education|skills|projects|awards|publications|references)|$)",
-    re.IGNORECASE
+    r"\n\s*(Experience|Work Experience|Professional Experience|Employment History)\s*[:\n]", re.IGNORECASE
 )
 SUMMARY_SECTION_PATTERN = re.compile(
-     r"(summary|objective|profile|about me|professional profile|personal statement)\s*?\n([\s\S]+?)(?=\n\s*(?:experience|skills|education|projects)|$)",
+     r"\n\s*(Summary|Objective|Profile|About Me|Professional Profile|Personal Statement)\s*[:\n]", re.IGNORECASE
+)
+# DEGREE_PATTERN: Used in _parse_single_education_entry
+# DATE_PATTERN_GENERIC: Used in _parse_single_education_entry
+# JOB_DATE_PATTERN: Used in _parse_single_experience_entry
+
+# Section Enders: Keywords that often signify the end of a major section.
+# This helps in segmenting the resume text.
+SECTION_ENDERS_PATTERN = re.compile(
+    r"\n\s*(?:Education|Experience|Skills|Projects|Awards|Publications|References|Technical Skills|Work Experience|Professional Experience|Employment History|Academic Background|Qualifications|Interests|Languages|Certifications)\s*[:\n]",
     re.IGNORECASE
 )
-# For education parsing
-DEGREE_PATTERN = re.compile(r'\b(?:B\.?S\.?c?|M\.?S\.?c?|Ph\.?D|M\.?B\.?A|B\.?A\.?|Bachelor(?: of| of Science| of Arts)?|Master(?: of| of Science| of Arts)?|Doctor(?: of Philosophy)?)\b(?: in)?\s*([\w\s,]+)', re.IGNORECASE)
-# For dates (general, can be refined for specific contexts like grad date vs. job dates)
-DATE_PATTERN_GENERIC = re.compile(r'\b(?:(?:Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)\.?\s*)?\d{4}\b|\b\d{4}\s*-\s*\d{4}\b|\bPresent\b', re.IGNORECASE)
-JOB_DATE_PATTERN = re.compile(r'\b(?:(?:Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)\.?\s*)?\d{4}\s*(?:-|to|–|—)\s*(?:(?:Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)\.?\s*)?(?:\d{4}|Present|Current)\b', re.IGNORECASE)
 
 
 # --- spaCy Model Loading ---
 try:
     nlp = spacy.load('en_core_web_sm')
-    print("spaCy model 'en_core_web_sm' loaded successfully.")
+    print("Resume Parser: spaCy model 'en_core_web_sm' loaded successfully.")
 except OSError:
-    print("spaCy model 'en_core_web_sm' not found. Attempting to download...")
+    print("Resume Parser: spaCy model 'en_core_web_sm' not found. Attempting to download...")
     try:
         spacy.cli.download('en_core_web_sm')
         nlp = spacy.load('en_core_web_sm')
-        print("spaCy model 'en_core_web_sm' downloaded and loaded successfully.")
+        print("Resume Parser: spaCy model 'en_core_web_sm' downloaded and loaded successfully.")
     except Exception as e:
-        print(f"Could not download or load spaCy model: {e}. NER features will be limited.")
-        nlp = spacy.blank("en") # Fallback
+        print(f"Resume Parser: Could not download or load spaCy model: {e}. NER features will be limited.")
+        nlp = spacy.blank("en")
 
 # --- Text Extraction ---
-def extract_text_from_pdf(file_path: str) -> str | None:
-    """
-    Extracts text content from a PDF file.
-    Args:
-        file_path: Path to the PDF file.
-    Returns:
-        Extracted text as a string, or None if an error occurs.
-    """
+def extract_text_from_pdf(file_path: str) -> Optional[str]:
+    """Extracts text content from a PDF file."""
     try:
         with open(file_path, 'rb') as pdf_file:
             pdf_reader = PyPDF2.PdfReader(pdf_file)
             text = "".join(page.extract_text() for page in pdf_reader.pages if page.extract_text())
-        return text
+        return text if text.strip() else None # Return None if only whitespace
     except Exception as e:
         print(f"Error extracting text from PDF '{file_path}': {e}")
         return None
 
-def extract_text_from_docx(file_path: str) -> str | None:
-    """
-    Extracts text content from a DOCX file.
-    Args:
-        file_path: Path to the DOCX file.
-    Returns:
-        Extracted text as a string, or None if an error occurs.
-    """
+def extract_text_from_docx(file_path: str) -> Optional[str]:
+    """Extracts text content from a DOCX file."""
     try:
-        doc = docx.Document(file_path)
-        text = "\n".join(paragraph.text for paragraph in doc.paragraphs)
-        return text
+        doc_obj = docx.Document(file_path)
+        text = "\n".join(paragraph.text for paragraph in doc_obj.paragraphs)
+        return text if text.strip() else None # Return None if only whitespace
     except Exception as e:
         print(f"Error extracting text from DOCX '{file_path}': {e}")
         return None
 
 # --- Core Parsing Functions ---
-def parse_name(doc: spacy.tokens.Doc) -> str | None:
-    """
-    Parses the full name from a spaCy Doc object using NER and pattern matching.
-    Args:
-        doc: spaCy Doc object of the resume text.
-    Returns:
-        The extracted full name, or None if not found.
-    """
-    matcher = Matcher(nlp.vocab)
-    pattern = [{'POS': 'PROPN'}, {'POS': 'PROPN'}]  # Matches two consecutive proper nouns
-    matcher.add('NAME', [pattern])
-    matches = matcher(doc)
-    for _, start, end in matches: # Using _ for match_id as it's not used
-        return doc[start:end].text
-
-    for ent in doc.ents: # Fallback to PERSON entity
+def parse_name(doc: spacy.tokens.Doc, text_lines: List[str]) -> Optional[str]:
+    """Parses the full name. Prefers NER, then pattern matching, then first sensible line."""
+    for ent in doc.ents:
         if ent.label_ == "PERSON":
-            return ent.text
+            return ent.text.strip()
+
+    matcher = Matcher(nlp.vocab) # Moved Matcher instantiation inside for safety if nlp is blank
+    pattern = [{'POS': 'PROPN'}, {'POS': 'PROPN'}]
+    matcher.add('FULL_NAME_PROPN', [pattern])
+    matches = matcher(doc[:300]) # Search near the beginning
+    for _, start, end in matches:
+        name_candidate = doc[start:end].text.strip()
+        if len(name_candidate.split()) <= 3: # Avoid overly long "names"
+             return name_candidate
+
+    # Fallback: First non-empty line that seems like a name (heuristic)
+    if text_lines:
+        first_line = text_lines[0].strip()
+        if len(first_line.split()) <= 4 and re.match(r"^[A-Z][a-zA-Z\s.-]*$", first_line): # Starts with Cap, few words
+            return first_line
     return None
 
-def parse_email(text: str) -> str | None:
-    """
-    Parses the email address from text using regex.
-    Args:
-        text: The text to parse.
-    Returns:
-        The extracted email address, or None if not found.
-    """
+def parse_email(text: str) -> Optional[str]:
+    """Parses the email address from text using regex."""
     match = EMAIL_PATTERN.search(text)
     return match.group(0) if match else None
 
-def parse_phone(text: str) -> str | None:
-    """
-    Parses the phone number from text using regex.
-    Args:
-        text: The text to parse.
-    Returns:
-        The extracted phone number, or None if not found.
-    """
+def parse_phone(text: str) -> Optional[str]:
+    """Parses the phone number from text using regex."""
     match = PHONE_PATTERN.search(text)
     return match.group(0) if match else None
 
-def parse_skills(doc: spacy.tokens.Doc, text_lower: str) -> list[str]:
-    """
-    Parses skills from the resume text using a predefined list and section headers.
-    Args:
-        doc: spaCy Doc object of the resume text.
-        text_lower: Lowercased version of the resume text.
-    Returns:
-        A sorted list of unique skills found.
-    """
-    # Consider moving SKILLS_LIST to a separate file or making it more configurable
-    skills_list = [
+def parse_skills(doc: spacy.tokens.Doc, text_lower: str) -> List[str]:
+    """Parses skills using a predefined list, NER (for ORG/PRODUCT), and section headers."""
+    # SKILLS_LIST can be externalized to a JSON or text file for easier management.
+    skills_list_keywords = [
         'python', 'java', 'c++', 'c#', 'javascript', 'typescript', 'sql', 'nosql', 'mongodb', 'postgresql',
-        'react', 'angular', 'vue', 'node.js', 'django', 'flask', 'spring boot', 'html', 'css',
-        'aws', 'azure', 'gcp', 'docker', 'kubernetes', 'terraform', 'ansible', 'ci/cd',
-        'machine learning', 'deep learning', 'nlp', 'natural language processing', 'computer vision',
-        'data analysis', 'data science', 'pandas', 'numpy', 'scikit-learn', 'tensorflow', 'pytorch',
-        'agile', 'scrum', 'jira', 'git', 'restful apis', 'microservices',
-        'communication', 'teamwork', 'problem solving', 'leadership', 'project management'
-        # This list can be significantly expanded
+        'react', 'angular', 'vue', 'node.js', 'django', 'flask', 'spring boot', 'html', 'css', 'scss', 'sass',
+        'aws', 'azure', 'gcp', 'docker', 'kubernetes', 'k8s', 'terraform', 'ansible', 'ci/cd', 'jenkins',
+        'machine learning', 'deep learning', 'nlp', 'natural language processing', 'computer vision', 'ai',
+        'data analysis', 'data science', 'data visualization', 'pandas', 'numpy', 'scikit-learn', 'tensorflow', 'pytorch',
+        'agile', 'scrum', 'jira', 'git', 'github', 'gitlab', 'restful apis', 'microservices', 'api design',
+        'communication', 'teamwork', 'problem solving', 'leadership', 'project management', 'product management',
+        'big data', 'spark', 'hadoop', 'kafka', 'data warehousing', 'etl', 'data modeling', 'statistics',
+        'cybersecurity', 'penetration testing', 'cryptography', 'network security', 'siem', 'ui/ux design'
     ]
     found_skills = set()
 
-    # Method 1: Keyword matching in the whole document (already lowercased)
-    for skill in skills_list:
-        if skill in text_lower: # Direct substring check
-            found_skills.add(skill.capitalize())
+    # Method 1: Keyword matching (whole document)
+    for skill in skills_list_keywords:
+        # Use word boundaries for more precise matching of keywords
+        if re.search(r'\b' + re.escape(skill) + r'\b', text_lower):
+            found_skills.add(skill.capitalize() if not skill.isupper() else skill)
 
-    # Method 2: Look for specific skill sections
-    matches = SKILL_SECTION_PATTERN.finditer(text_lower) # Use pre-compiled regex
-    for match in matches:
+    # Method 2: NER for potential technologies (ORG, PRODUCT often catch tech names)
+    for ent in doc.ents:
+        if ent.label_ in ["ORG", "PRODUCT"]:
+            ent_text_lower = ent.text.lower()
+            # Check if the NER entity is in our skill list or a known variant
+            if ent_text_lower in skills_list_keywords:
+                 found_skills.add(ent_text_lower.capitalize() if not ent_text_lower.isupper() else ent_text_lower)
+            # Could add more logic here to accept ORG/PRODUCT if they look like tech, even if not in list.
+            # For example, if it contains "SDK", "API", "Framework", etc.
+            elif any(tech_kw in ent_text_lower for tech_kw in ['sdk', 'api', 'framework', 'platform', 'library']):
+                 found_skills.add(ent.text.strip())
+
+
+    # Method 3: Look for specific skill sections
+    skill_section_regex = re.compile(
+        r"(skills|technical skills|proficiencies|technologies|technical proficiencies|core competencies)[\s:]*\n((?:.|\n)+?)(?=\n\s*(?:Education|Experience|Projects|Awards)|$)",
+        re.IGNORECASE
+    )
+    section_matches = skill_section_regex.finditer(text) # Use original text for spaCy processing if needed
+    for match in section_matches:
         section_content = match.group(2).strip()
         section_doc = nlp(section_content) # Process only the section with spaCy
-        for token in section_doc:
-            if token.lemma_.lower() in skills_list:
-                 found_skills.add(token.lemma_.capitalize())
-        for skill_phrase in skills_list: # Check for multi-word skills in the section
-            if skill_phrase in section_content:
-                 found_skills.add(skill_phrase.capitalize())
+        for token in section_doc: # Lemmatized check against keywords
+            if token.lemma_.lower() in skills_list_keywords:
+                 found_skills.add(token.lemma_.capitalize() if not token.lemma_.isupper() else token.lemma_)
+        for skill_phrase in skills_list_keywords: # Check for multi-word skills in the section text
+            if re.search(r'\b' + re.escape(skill_phrase) + r'\b', section_content.lower()):
+                 found_skills.add(skill_phrase.capitalize() if not skill_phrase.isupper() else skill_phrase)
+        # Add comma/bullet separated items from the section as potential skills
+        items_in_section = re.split(r'[,;\n•*-]\s*', section_content)
+        for item in items_in_section:
+            item_clean = item.strip()
+            if 1 < len(item_clean) < 30 : # Heuristic for skill length
+                # Optional: Add only if it looks like a skill (e.g., capitalized, contains certain characters)
+                # For now, adding if it's a reasonable length.
+                found_skills.add(item_clean)
 
-    return sorted(list(found_skills))
+    return sorted(list(s for s in found_skills if s)) # Filter out any empty strings
 
-def parse_summary(doc: spacy.tokens.Doc, text: str) -> str | None:
-    """
-    Parses the summary/objective section from the resume text.
-    Args:
-        doc: spaCy Doc object of the resume text. (Currently unused, text is sufficient)
-        text: The full resume text.
-    Returns:
-        The extracted summary string, or None if not found.
-    """
-    match = SUMMARY_SECTION_PATTERN.search(text)
-    return match.group(2).strip() if match else None
+def _extract_section_text(pattern: re.Pattern, text: str) -> Optional[str]:
+    """Helper to extract text for a given section pattern."""
+    match = pattern.search(text)
+    if match:
+        # Find where this section ends by looking for the start of the next major section
+        section_text = match.group(0) # The whole match including the header
+        content_after_header = text[match.end():]
+        next_section_match = SECTION_ENDERS_PATTERN.search(content_after_header)
+        if next_section_match:
+            return section_text + content_after_header[:next_section_match.start()]
+        else: # Section is the last one
+            return section_text + content_after_header
+    return None
 
-def _parse_single_education_entry(entry_text: str) -> dict | None:
+def parse_summary(doc: spacy.tokens.Doc, text: str) -> Optional[str]:
+    """Parses the summary/objective section."""
+    summary_text_block = _extract_section_text(SUMMARY_SECTION_PATTERN, text)
+    if summary_text_block:
+        # Remove the header itself from the extracted block
+        header_match = SUMMARY_SECTION_PATTERN.match(summary_text_block) # Match from start
+        if header_match:
+            return summary_text_block[header_match.end():].strip()
+    return None
+
+
+def _parse_single_education_entry(entry_text: str) -> Optional[Dict[str, str]]:
     """Helper function to parse a single education entry block."""
-    if not entry_text.strip() or len(entry_text.strip()) < 10:
-        return None
+    entry_text = entry_text.strip()
+    if not entry_text or len(entry_text) < 10: return None
 
     entry_doc = nlp(entry_text)
-    degree_match = DEGREE_PATTERN.search(entry_text)
+    # Regex patterns should be pre-compiled or defined globally for efficiency
+    degree_pattern = re.compile(r'\b(?:B\.?S\.?c?|M\.?S\.?c?|Ph\.?D|M\.?B\.?A|B\.?A\.?|Associate|Diploma|Certificate|Bachelor(?: of| of Science| of Arts)?|Master(?: of| of Science| of Arts)?|Doctor(?: of Philosophy)?)\b(?: in| of)?\s*([\w\s,.&()-]+)', re.IGNORECASE)
+    date_pattern = re.compile(r'\b(?:(?:Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)\.?\s*)?(?:\d{4}|\d{2})\b(?:[-\s/to]+\b(?:(?:Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)\.?\s*)?(?:\d{4}|\d{2})\b|\bPresent\b|\bCurrent\b)?', re.IGNORECASE)
 
-    degree = None
-    if degree_match:
-        degree = degree_match.group(1).strip() if degree_match.group(1) else degree_match.group(0).strip()
+    degree_match = degree_pattern.search(entry_text)
+    degree = degree_match.group(1).strip().rstrip(',') if degree_match and degree_match.group(1) else (degree_match.group(0) if degree_match else None)
 
     institution, date_str = None, None
     for ent in entry_doc.ents:
         if ent.label_ == "ORG" and not institution:
-            if any(uni_kw in ent.text.lower() for uni_kw in ['university', 'college', 'institute']):
-                institution = ent.text
-        elif ent.label_ == "DATE" and not date_str and DATE_PATTERN_GENERIC.search(ent.text):
-            date_str = ent.text
+            if any(kw in ent.text.lower() for kw in ['university', 'college', 'institute', 'school', 'academy']):
+                institution = ent.text.strip()
+        elif ent.label_ == "DATE" and not date_str:
+            if date_pattern.search(ent.text): date_str = ent.text.strip()
 
-    if not date_str: # Fallback regex for dates
-        date_match_fallback = DATE_PATTERN_GENERIC.search(entry_text)
-        if date_match_fallback: date_str = date_match_fallback.group(0)
+    if not date_str:
+        date_match_fallback = date_pattern.search(entry_text)
+        if date_match_fallback: date_str = date_match_fallback.group(0).strip()
 
-    # Basic fallback for institution if not found via NER
-    if not institution and degree and degree_match:
-        possible_institution_text = entry_text[degree_match.end():]
-        if date_str and date_match_fallback: # if date was found by regex
-             possible_institution_text = possible_institution_text[:date_match_fallback.start()]
-        inst_candidates = re.findall(r'((?:[A-Z][\w\s.&\'()-]+)+)', possible_institution_text) # Slightly more permissive
-        if inst_candidates:
-            institution = max(inst_candidates, key=len).strip().replace('\n',' ')
-            if len(institution.split()) > 7: institution = " ".join(institution.split()[:7]) # Heuristic limit
+    # Heuristic for institution if not found by NER
+    if not institution and (degree or date_str):
+        # Attempt to find text between degree and date, or just capitalized phrases.
+        # This remains a complex heuristic.
+        # For simplicity, if degree is found, assume text after it could be institution.
+        # This needs more refinement for real-world accuracy.
+        if degree_match:
+            remaining_text = entry_text[degree_match.end():].strip()
+            if date_str: # If date is also found, take text between degree and date
+                date_idx = remaining_text.lower().find(date_str.lower())
+                if date_idx != -1: remaining_text = remaining_text[:date_idx].strip()
+
+            # Find capitalized words/phrases in remaining text
+            potential_inst = re.findall(r'([A-Z][\w\s.&\'()-]+(?:University|College|Institute|School|Academy)?\b)', remaining_text)
+            if potential_inst: institution = potential_inst[0].strip().rstrip(',') # Take first likely candidate
+            elif remaining_text and len(remaining_text.split()) < 7 : institution = remaining_text.strip().rstrip(',')
+
 
     if degree or institution or date_str:
-        return {
-            'degree': degree.strip().rstrip(',') if degree else "N/A",
-            'institution': institution.strip().rstrip(',') if institution else "N/A",
-            'date': date_str.strip() if date_str else "N/A"
-        }
+        return {'degree': degree or "N/A", 'institution': institution or "N/A", 'date': date_str or "N/A"}
     return None
 
-
-def parse_education(doc: spacy.tokens.Doc, text: str) -> list[dict]:
-    """
-    Parses education details from the resume text.
-    Args:
-        doc: spaCy Doc object of the resume text. (Currently unused, text is sufficient)
-        text: The full resume text.
-    Returns:
-        A list of dictionaries, each representing an education entry.
-    """
+def parse_education(doc: spacy.tokens.Doc, text: str) -> List[Dict[str, str]]:
+    """Parses education details from the resume text."""
     education_entries = []
-    section_match = EDUCATION_SECTION_PATTERN.search(text)
-    if not section_match:
-        return education_entries
+    education_text_block = _extract_section_text(EDUCATION_SECTION_PATTERN, text)
+    if not education_text_block: return education_entries
 
-    education_text = section_match.group(2)
-    # Improved splitting logic: consider lines starting with a degree, or major capitalized words (potential institution)
-    # This regex attempts to split entries more robustly.
-    potential_entries = re.split(r'\n\s*\n+|\n(?=\s*(?:B\.?S|M\.?S|Ph\.?D|Bachelor|Master|Doctor|[A-Z][a-z]+ University|[A-Z][a-z]+ College))', education_text.strip())
+    # Remove the header itself from the extracted block
+    header_match = EDUCATION_SECTION_PATTERN.match(education_text_block)
+    if header_match: education_text_block = education_text_block[header_match.end():].strip()
+
+    # Split entries by double newlines or lines that look like a new degree/institution
+    potential_entries = re.split(r'\n\s*\n+|\n(?=\s*(?:[A-Z][\w\s,.&()-]+\s*(?:University|College|Institute|School|Academy)|(?:B\.?S|M\.?S|Ph\.?D|Bachelor|Master|Doctor)))', education_text_block)
 
     for entry_text in potential_entries:
-        try:
-            parsed_entry = _parse_single_education_entry(entry_text)
-            if parsed_entry:
-                education_entries.append(parsed_entry)
-        except Exception as e:
-            print(f"Error parsing education entry: '{entry_text[:50]}...': {e}")
-            continue # Skip problematic entries
-
+        if entry_text.strip():
+            try:
+                parsed_entry = _parse_single_education_entry(entry_text)
+                if parsed_entry: education_entries.append(parsed_entry)
+            except Exception as e: print(f"Error parsing education entry: '{entry_text[:50]}...': {e}")
     return education_entries
 
-def _parse_single_experience_entry(entry_text: str) -> dict | None:
+
+def _parse_single_experience_entry(entry_text: str) -> Optional[Dict[str, str]]:
     """Helper function to parse a single experience entry block."""
     entry_text = entry_text.strip()
-    if not entry_text or len(entry_text) < 20:
-        return None
+    if not entry_text or len(entry_text) < 15: return None # Min length for a meaningful entry
 
-    job_title, company, date_range = None, None, None
-    description_lines = []
+    job_title, company, date_range, description = None, None, None, []
+    lines = entry_text.split('\n')
 
-    # Try to find date range first
-    date_match = JOB_DATE_PATTERN.search(entry_text)
-    entry_text_no_date = entry_text
-    if date_match:
-        date_range = date_match.group(0)
-        entry_text_no_date = entry_text.replace(date_range, "").strip()
+    # Date extraction (try from any line, but often top or bottom)
+    job_date_pattern_local = re.compile(JOB_DATE_PATTERN.pattern, JOB_DATE_PATTERN.flags) # Ensure it's compiled
+    for i, line in enumerate(lines):
+        date_match = job_date_pattern_local.search(line)
+        if date_match:
+            date_range = date_match.group(0).strip()
+            # Remove date part from line to avoid re-parsing as title/company
+            lines[i] = job_date_pattern_local.sub('', line).strip()
+            break # Assume one date range per entry for simplicity
 
-    # Heuristic for Title and Company from the first significant line
-    lines = entry_text_no_date.split('\n')
-    first_line_processed = False
-    if lines:
-        first_line = lines[0].strip()
-        # Common patterns: "Title at Company", "Title, Company", "Title - Company"
-        match_title_company = re.match(r'([\w\s.&\'()/-]+?)\s*(?:at|@|,|-)\s*([\w\s.&\'()/-]+)', first_line, re.IGNORECASE)
-        if match_title_company:
-            job_title = match_title_company.group(1).strip()
-            company = match_title_company.group(2).strip()
-            first_line_processed = True
-        else: # If no clear separator, assume first line is title or title+company
-            # NER on the first line to find ORG for company
-            first_line_doc = nlp(first_line)
-            for ent in first_line_doc.ents:
-                if ent.label_ == "ORG" and not company:
-                    company = ent.text
-            # What remains of the first line (if company found) or whole first line is job_title
-            job_title = first_line.replace(company, "").strip() if company else first_line
-            first_line_processed = True
+    # Title and Company (often in the first few non-date lines)
+    # This is highly heuristic.
+    processed_header_lines = 0
+    for i, line in enumerate(lines):
+        line_stripped = line.strip()
+        if not line_stripped or line_stripped == date_range: # Skip empty or already processed date lines
+            processed_header_lines += 1
+            continue
+        if i > 2 and (job_title or company): # Assume header is within first 3 lines usually
+            break
 
-    # Fallback NER for company on the whole entry_text_no_date if not found
-    if not company:
-        entry_doc_no_date = nlp(entry_text_no_date)
-        for ent in entry_doc_no_date.ents:
-            if ent.label_ == "ORG":
-                company = ent.text
-                break
+        # Try to match "Title at Company" or "Title, Company" or "Title - Company"
+        title_company_match = re.match(r'([\w\s.&\'()/-]+?)\s*(?:at|@|,|-)\s*([\w\s.&\'()/-]+)', line_stripped, re.IGNORECASE)
+        if title_company_match and not job_title and not company:
+            job_title = title_company_match.group(1).strip()
+            company = title_company_match.group(2).strip()
+            processed_header_lines +=1
+            break
 
-    # Description lines
-    start_desc_line = 1 if first_line_processed and (job_title or company) else 0
-    current_description = []
-    for i in range(start_desc_line, len(lines)):
-        line_content = lines[i].strip()
-        if line_content:
-            # Avoid re-capturing company or date if they are on separate lines within description area
-            if company and company == line_content: continue
-            if date_range and date_range == line_content: continue
-            current_description.append(line_content)
-    description = "\n".join(current_description).strip()
+        # If no clear separator, use NER on the line
+        line_doc = nlp(line_stripped)
+        current_line_orgs = [ent.text.strip() for ent in line_doc.ents if ent.label_ == "ORG"]
+
+        if not company and current_line_orgs:
+            company = current_line_orgs[0] # Take first ORG as company
+            # Assume rest of the line (if any) is job title
+            if not job_title: job_title = line_stripped.replace(company, "").strip().rstrip(',-')
+        elif not job_title: # No company found yet on this line via NER, assume line is title
+            job_title = line_stripped.strip().rstrip(',-')
+
+        processed_header_lines +=1
+        if job_title and company: break # Found both
+
+    # Description lines (remaining lines)
+    description_lines = [line.strip() for line in lines[processed_header_lines:] if line.strip() and line.strip() != date_range]
+    description = "\n".join(description_lines).strip()
 
     if job_title or company or date_range:
         return {
-            'job_title': job_title.strip() if job_title else "N/A",
-            'company': company.strip() if company else "N/A",
-            'date_range': date_range.strip() if date_range else "N/A",
-            'description': description if description else "N/A"
+            'job_title': job_title or "N/A", 'company': company or "N/A",
+            'date_range': date_range or "N/A", 'description': description or "N/A"
         }
     return None
 
-
-def parse_experience(doc: spacy.tokens.Doc, text: str) -> list[dict]:
-    """
-    Parses work experience details from the resume text.
-    Args:
-        doc: spaCy Doc object of the resume text. (Currently unused, text is sufficient)
-        text: The full resume text.
-    Returns:
-        A list of dictionaries, each representing a work experience entry.
-    """
+def parse_experience(doc: spacy.tokens.Doc, text: str) -> List[Dict[str, str]]:
+    """Parses work experience details."""
     experience_entries = []
-    section_match = EXPERIENCE_SECTION_PATTERN.search(text)
-    if not section_match:
-        return experience_entries
+    experience_text_block = _extract_section_text(EXPERIENCE_SECTION_PATTERN, text)
+    if not experience_text_block: return experience_entries
 
-    experience_text = section_match.group(2)
-    # Splitting logic for experience entries (improved)
-    # Split by two or more newlines, or a newline followed by a potential job title (capitalized words, possibly with 'at' or ',')
-    # or a newline followed by a date range.
-    job_entry_splits = re.split(
-        r'\n\s*\n\s*\n*|\n(?=\s*(?:[A-Z][\w\s.&\'()/-]+(?:Engineer|Developer|Manager|Analyst|Specialist|Lead|Architect|Consultant)\b|[A-Z][\w\s.&\'()/-]+\s*(?:at|@|,|-)\s*[A-Z])|\n\s*(?:(?:Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)\.?\s*)?\d{4}\s*-\s*)',
-        experience_text.strip()
+    header_match = EXPERIENCE_SECTION_PATTERN.match(experience_text_block)
+    if header_match: experience_text_block = experience_text_block[header_match.end():].strip()
+
+    # Split entries: two+ newlines OR newline followed by potential job title/company (often capitalized) OR date range
+    entry_splits = re.split(
+        r'\n\s*\n\s*\n*|\n(?=\s*(?:[A-Z][\w\s.,&\'()/-]{5,}\s*(?:at|@|,|-|\|)?\s*[A-Z][\w\s.,&\'()/-]{2,}|(?:Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)\b|\d{4}\s*-\s*\d{4}))',
+        experience_text_block
     )
-
-    for entry_text in job_entry_splits:
-        try:
-            parsed_entry = _parse_single_experience_entry(entry_text)
-            if parsed_entry:
-                experience_entries.append(parsed_entry)
-        except Exception as e:
-            print(f"Error parsing experience entry: '{entry_text[:50]}...': {e}")
-            continue # Skip problematic entries
+    for entry_text in entry_splits:
+        if entry_text.strip():
+            try:
+                parsed_entry = _parse_single_experience_entry(entry_text)
+                if parsed_entry: experience_entries.append(parsed_entry)
+            except Exception as e: print(f"Error parsing experience entry: '{entry_text[:50]}...': {e}")
 
     return experience_entries
 
 # --- Main Parsing Orchestrator ---
-def parse_resume_text(text: str) -> dict:
-    """
-    Main function to parse extracted text from a resume to find structured data.
-    Uses spaCy for NLP tasks and regex for pattern matching.
-    Args:
-        text: The raw text content of the resume.
-    Returns:
-        A dictionary containing parsed resume data.
-    """
+def parse_resume_text(text: str) -> Dict[str, Any]:
+    """Main function to parse resume text."""
     if not text or not isinstance(text, str):
-        print("Invalid input text for parsing.")
-        return {} # Return empty dict for invalid input
+        print("Invalid input text for parsing: Must be a non-empty string.")
+        return RB_FIELDS_DEFINITIONS_DEFAULT.copy() # Ensure a default structure
 
     doc = nlp(text)
     text_lower = text.lower()
+    text_lines = text.split('\n')
 
-    # Initialize with default values
-    resume_data = {
+    # Initialize with default values from a constant to ensure consistency
+    # (Assuming RB_FIELDS_DEFINITIONS_DEFAULT is defined similarly to RB_FIELDS_DEFINITIONS in app)
+    # For now, defining a local default:
+    parsed_data = {
         "name": "N/A", "email": "N/A", "phone": "N/A",
-        "skills": ["N/A"], "summary": "N/A",
+        "skills": [], "summary": "N/A",
         "education": [], "experience": []
     }
+
     try:
-        resume_data["name"] = parse_name(doc) or (text.split('\n')[0].strip() if text.split('\n') and text.split('\n')[0].strip() else "N/A")
-        resume_data["email"] = parse_email(text) or "N/A"
-        resume_data["phone"] = parse_phone(text) or "N/A"
-        resume_data["skills"] = parse_skills(doc, text_lower) or ["N/A"]
-        resume_data["summary"] = parse_summary(doc, text) or "N/A" # doc is passed but currently unused by summary
+        parsed_data["name"] = parse_name(doc, text_lines) or "N/A"
+        parsed_data["email"] = parse_email(text) or "N/A"
+        parsed_data["phone"] = parse_phone(text) or "N/A"
+        parsed_data["skills"] = parse_skills(doc, text_lower) # Returns list, empty if none
+        parsed_data["summary"] = parse_summary(doc, text) or "N/A"
 
-        # Education and Experience can raise errors during their complex parsing
-        try:
-            resume_data["education"] = parse_education(doc, text)
-        except Exception as e:
-            print(f"Critical error in parse_education: {e}")
-            resume_data["education"] = [] # Ensure it's a list
-
-        try:
-            resume_data["experience"] = parse_experience(doc, text)
-        except Exception as e:
-            print(f"Critical error in parse_experience: {e}")
-            resume_data["experience"] = [] # Ensure it's a list
+        parsed_data["education"] = parse_education(doc, text)
+        parsed_data["experience"] = parse_experience(doc, text)
 
     except Exception as e:
-        print(f"An unexpected error occurred during resume parsing: {e}")
-        # Ensure basic structure is still returned
-        for key, value in resume_data.items():
-            if value is None: # Should not happen with defaults, but as a safeguard
-                resume_data[key] = "N/A" if not isinstance(value, list) else []
+        print(f"Critical error during resume parsing: {e}")
+        # Ensure structure is preserved even on critical error
+        for key, default_val_type in [("name",str), ("email",str), ("phone",str), ("skills",list), ("summary",str), ("education",list), ("experience",list)]:
+            if key not in parsed_data or not isinstance(parsed_data[key], default_val_type):
+                parsed_data[key] = "N/A" if default_val_type == str else []
 
-    # Add placeholder dicts if education/experience are empty, for consistent UI handling
-    if not resume_data["education"]:
-        resume_data["education"] = [{'degree': 'N/A', 'institution': 'N/A', 'date': 'N/A'}]
-    if not resume_data["experience"]:
-        resume_data["experience"] = [{'job_title': 'N/A', 'company': 'N/A', 'date_range': 'N/A', 'description': 'N/A'}]
+    # Ensure list fields are lists, even if empty, and string fields are strings.
+    # And add placeholder dicts if education/experience are empty for consistent UI handling in Streamlit.
+    if not parsed_data["skills"]: parsed_data["skills"] = ["N/A"] # If empty list, make it ["N/A"]
+    if not parsed_data["education"]: parsed_data["education"] = [{'degree': 'N/A', 'institution': 'N/A', 'date': 'N/A'}]
+    if not parsed_data["experience"]: parsed_data["experience"] = [{'job_title': 'N/A', 'company': 'N/A', 'date_range': 'N/A', 'description': 'N/A'}]
 
-    return resume_data
+    return parsed_data
 
-# --- Test Section ---
+# --- Test Section (Example Usage) ---
 if __name__ == '__main__':
     sample_text_for_testing = """
 Johnathan R. Doe III
@@ -422,49 +399,33 @@ Seeking a challenging role in a dynamic organization.
 
 Work Experience
 
-Lead Software Developer | QuantumLeap Tech | Jan 2020 – Present
+Lead Software Developer
+QuantumLeap Tech, Remote | Jan 2020 – Present
 - Spearheaded the development of a new microservices-based platform using Python, Flask, Docker, and Kubernetes on AWS.
 - Managed a team of 6 software engineers, providing mentorship and technical guidance.
 - Reduced system latency by 25% through performance optimization and architectural improvements.
-- Implemented CI/CD pipelines using Jenkins and Ansible, improving deployment frequency by 50%.
 
-Software Engineer | AlphaBeta Solutions | June 2015 - Dec 2019
+Software Engineer at AlphaBeta Solutions | June 2015 - Dec 2019
 - Developed and maintained scalable web applications using Java, Spring Boot, and PostgreSQL.
 - Collaborated with cross-functional teams to define project requirements and deliver features.
-- Contributed to API design and development for third-party integrations.
-- Received 'Innovator of the Year' award in 2018 for a novel algorithm design.
 
 Education
 
-Massachusetts Institute of Technology (MIT), Cambridge, MA | Sep 2011 – May 2015
-Master of Science (M.S.) in Computer Science
-Thesis: Efficient Algorithms for Large-Scale Data Processing
+Massachusetts Institute of Technology (MIT)
+M.S. in Computer Science | May 2015
+Thesis: Efficient Algorithms for Large-Scale Data Processing.
 
-Stanford University, Stanford, CA | Sep 2007 – June 2011
-Bachelor of Science (B.S.) in Computer Engineering, Minor in Mathematics
-GPA: 3.9/4.0, Magna Cum Laude
+Stanford University, CA
+Bachelor of Science (B.S.) in Computer Engineering, Minor in Mathematics. June 2011. GPA: 3.9/4.0.
 
-Technical Skills
-Programming Languages: Python (Expert), Java (Expert), C++, SQL, JavaScript, TypeScript
-Frameworks & Libraries: Flask, Django, Spring Boot, React, Angular, Pandas, NumPy, Scikit-learn, TensorFlow
-Databases: PostgreSQL, MySQL, MongoDB, Redis
-Cloud & DevOps: AWS (EC2, S3, Lambda, EKS), Azure, GCP, Docker, Kubernetes, Jenkins, Ansible, Terraform, Git
-Methodologies: Agile, Scrum, DevOps, Microservices, TDD
-
-Projects
-AI Resume Analyzer | Python, spaCy, Streamlit
-- Developed a tool to parse resumes and match them against job descriptions. (This project!)
-
-Personal Finance Tracker | React, Node.js, MongoDB
-- Created a web application for tracking personal expenses and investments.
+Technical Skills: Python (Expert), Java (Expert), C++, SQL, JavaScript, TypeScript, AWS, Azure, Docker, Kubernetes, Agile, Scrum.
     """
 
-    print("--- Running Parser in Main (Test Mode) ---")
-    if nlp.meta.get('lang') == 'en' and 'ner' in nlp.pipe_names: # More robust check for a functional model
+    print("--- Running Resume Parser in Test Mode ---")
+    if nlp.meta.get('lang') == 'en' and 'ner' in nlp.pipe_names:
         parsed_data = parse_resume_text(sample_text_for_testing)
-        print("\n--- Parsed Data ---")
         import json
         print(json.dumps(parsed_data, indent=2))
     else:
-        print("Skipping test run as a functional spaCy model with NER might not be fully loaded.")
+        print("Skipping test: spaCy model 'en_core_web_sm' not fully loaded or functional.")
     pass
