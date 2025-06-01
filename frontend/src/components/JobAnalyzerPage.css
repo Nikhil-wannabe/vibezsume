@@ -1,0 +1,144 @@
+/* frontend/src/components/JobAnalyzerPage.css */
+.job-analyzer-page .job-input-section {
+    display: flex;
+    flex-direction: column;
+    gap: 15px;
+    margin-bottom: 20px;
+}
+
+.job-analyzer-page .analyzer-form {
+    padding: 15px;
+    background-color: #f9f9f9;
+    border-radius: 8px;
+    border: 1px solid #eee;
+}
+
+.job-analyzer-page .inline-form { /* For URL input and button on one line if space allows */
+    display: flex;
+    align-items: flex-end; /* Aligns button with bottom of input */
+    gap: 10px;
+}
+.job-analyzer-page .inline-form .form-group {
+    flex-grow: 1; /* Input takes available space */
+    margin-bottom: 0; /* Remove default margin if inline */
+}
+
+.job-analyzer-page .form-group label {
+    display: block;
+    margin-bottom: 5px;
+    font-weight: bold;
+    color: #555;
+}
+
+.job-analyzer-page input[type="url"],
+.job-analyzer-page textarea {
+    width: 100%;
+    box-sizing: border-box;
+    padding: 8px;
+    border: 1px solid #ddd;
+    border-radius: 4px;
+}
+
+.job-analyzer-page textarea {
+    min-height: 150px;
+    font-family: inherit;
+    font-size: 0.95em;
+}
+
+.job-analyzer-page .or-divider {
+    text-align: center;
+    font-weight: bold;
+    color: #777;
+    margin: 5px 0;
+}
+
+.processed-job-text-container {
+    margin-top: 20px;
+    padding: 15px;
+    background-color: #e9f5ff; /* Light blue background */
+    border: 1px solid #c7e0f4;
+    border-radius: 5px;
+}
+
+.processed-job-text-container h3 {
+    margin-top: 0;
+    color: #2c3e50;
+}
+
+.job-text-display {
+    background-color: #fff;
+    padding: 10px;
+    border-radius: 4px;
+    border: 1px solid #ddd;
+    white-space: pre-wrap; /* Wrap text but preserve line breaks */
+    max-height: 300px;
+    overflow-y: auto;
+    font-size: 0.9em;
+    line-height: 1.5;
+}
+
+.job-analyzer-page .compare-button {
+    margin-top: 15px;
+    background-color: #27ae60; /* Green for compare */
+    padding: 10px 15px;
+}
+.job-analyzer-page .compare-button:hover {
+    background-color: #229954;
+}
+
+.comparison-results-container {
+    margin-top: 20px;
+    padding: 15px;
+    background-color: #fdf6e3; /* Solarized light yellow for results */
+    border: 1px solid #f5e7c4;
+    border-radius: 5px;
+}
+
+.comparison-results-container h4 {
+    margin-top: 0;
+    color: #657b83; /* Solarized dark gray */
+}
+.comparison-results-container h5 {
+    color: #586e75; /* Solarized slightly lighter gray */
+    margin-top: 15px;
+    margin-bottom: 5px;
+}
+.comparison-results-container ul {
+    list-style-type: none;
+    padding-left: 0;
+}
+.comparison-results-container ul li {
+    padding: 3px 0;
+}
+.skill-match {
+    color: #2aa198; /* Solarized cyan/green */
+    font-weight: bold;
+}
+.skill-match::before { content: "✓ "; }
+
+.skill-missing {
+    color: #dc322f; /* Solarized red */
+}
+.skill-missing::before { content: "✗ "; }
+
+.keywords-list {
+    font-style: italic;
+    color: #93a1a1; /* Solarized light gray */
+    font-size: 0.9em;
+}
+
+/* Error and loading styles can be reused from App.css or ResumeAnalyzerPage.css if global,
+   or defined here if specific */
+.job-analyzer-page .error-message { /* Assuming .error-message is defined globally or imported */
+    color: #c0392b;
+    background-color: #fdd;
+    border: 1px solid #c0392b;
+    padding: 10px;
+    border-radius: 5px;
+    margin-top: 15px;
+}
+.job-analyzer-page .loading-spinner {
+    margin-top: 15px;
+    font-size: 1.1em;
+    color: #3498db;
+}

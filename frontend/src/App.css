@@ -1,0 +1,104 @@
+/* frontend/src/App.css */
+body {
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+    margin: 0;
+    padding: 0;
+    background-color: #f4f7f6;
+    color: #333;
+}
+
+.App {
+    text-align: center;
+}
+
+.App-header {
+    background-color: #2c3e50; /* Dark blue-gray */
+    padding: 20px;
+    color: white;
+    margin-bottom: 20px;
+}
+
+.App-header h1 {
+    margin: 0 0 10px 0;
+    font-size: 2em;
+}
+
+.App-header nav button {
+    background-color: transparent;
+    color: white;
+    border: 1px solid white;
+    padding: 10px 15px;
+    margin: 0 10px;
+    cursor: pointer;
+    font-size: 1em;
+    border-radius: 5px;
+    transition: background-color 0.3s, color 0.3s;
+}
+
+.App-header nav button:hover {
+    background-color: #3498db; /* Brighter blue */
+    border-color: #3498db;
+}
+
+.App-header nav button.active {
+    background-color: #2980b9; /* Slightly darker blue for active */
+    border-color: #2980b9;
+    font-weight: bold;
+}
+
+main {
+    padding: 20px;
+    max-width: 1200px;
+    margin: 0 auto;
+}
+
+.page-content {
+    background-color: #ffffff;
+    padding: 20px;
+    border-radius: 8px;
+    box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+    text-align: left; /* Content within pages aligned left */
+}
+
+.page-content h2 {
+    color: #2c3e50;
+    border-bottom: 2px solid #3498db;
+    padding-bottom: 10px;
+    margin-top: 0;
+}
+
+footer {
+    background-color: #34495e; /* Medium dark blue-gray */
+    color: white;
+    text-align: center;
+    padding: 15px;
+    position: fixed; /* Or relative, depending on design */
+    bottom: 0;
+    width: 100%;
+    font-size: 0.9em;
+}
+
+/* Basic form styling (will be expanded) */
+input[type="file"],
+input[type="text"],
+input[type="url"],
+textarea,
+button {
+    margin-bottom: 10px;
+    padding: 10px;
+    border-radius: 5px;
+    border: 1px solid #ccc;
+    font-size: 1em;
+}
+
+button {
+    background-color: #3498db;
+    color: white;
+    border: none;
+    cursor: pointer;
+    transition: background-color 0.2s;
+}
+
+button:hover {
+    background-color: #2980b9;
+}

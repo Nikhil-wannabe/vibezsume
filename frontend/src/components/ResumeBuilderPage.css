@@ -1,0 +1,129 @@
+/* frontend/src/components/ResumeBuilderPage.css */
+.resume-builder-page .resume-form {
+    margin-top: 20px;
+    text-align: left;
+}
+
+.resume-builder-page fieldset {
+    background-color: #fdfdfd;
+    border: 1px solid #eaeaea;
+    border-radius: 8px;
+    padding: 20px;
+    margin-bottom: 25px;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.05);
+}
+
+.resume-builder-page legend {
+    font-size: 1.4em;
+    font-weight: bold;
+    color: #3498db; /* Blue legend text */
+    padding: 0 10px;
+    margin-left: 10px; /* Align with fieldset padding */
+}
+
+.resume-builder-page .form-group {
+    margin-bottom: 15px;
+}
+
+.resume-builder-page .form-group label {
+    display: block;
+    margin-bottom: 6px;
+    font-weight: 600; /* Slightly bolder labels */
+    color: #444;
+}
+
+.resume-builder-page input[type="text"],
+.resume-builder-page input[type="email"],
+.resume-builder-page input[type="tel"],
+.resume-builder-page input[type="url"],
+.resume-builder-page textarea {
+    width: 100%;
+    padding: 10px;
+    border: 1px solid #ccc;
+    border-radius: 4px;
+    box-sizing: border-box;
+    font-size: 1em;
+    transition: border-color 0.2s;
+}
+
+.resume-builder-page input:focus,
+.resume-builder-page textarea:focus {
+    border-color: #3498db;
+    outline: none;
+    box-shadow: 0 0 0 2px rgba(52, 152, 219, 0.2);
+}
+
+.resume-builder-page textarea {
+    min-height: 80px;
+    resize: vertical;
+}
+
+/* For grid layout within sections like Personal Info */
+.resume-builder-page .form-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(250px, 1fr)); /* Responsive grid */
+    gap: 15px 20px; /* Row and column gap */
+}
+.resume-builder-page .form-group.full-width {
+    grid-column: 1 / -1; /* Span full width */
+}
+
+
+.resume-builder-page .resume-form-actions {
+    margin-bottom: 20px;
+    padding-bottom: 20px;
+    border-bottom: 1px solid #eee;
+    display: flex;
+    gap: 15px;
+    justify-content: flex-start; /* Align buttons to the start */
+}
+.resume-builder-page .resume-form-actions.bottom-actions {
+    margin-top: 20px;
+    border-top: 1px solid #eee;
+    border-bottom: none; /* No double border if also at top */
+}
+
+.resume-builder-page .resume-form-actions button {
+    padding: 10px 18px;
+    font-size: 1.05em;
+    min-width: 150px; /* Give buttons some minimum width */
+}
+
+.resume-builder-page .resume-form-actions button:disabled {
+    background-color: #bdc3c7;
+    cursor: not-allowed;
+}
+
+.success-message {
+    color: #27ae60; /* Green for success */
+    background-color: #e9f7ef;
+    border: 1px solid #27ae60;
+    padding: 10px;
+    border-radius: 5px;
+    margin: 15px 0;
+}
+
+.placeholder-text {
+    font-style: italic;
+    color: #888;
+    padding: 10px;
+    background-color: #f0f0f0;
+    border-radius: 4px;
+    text-align: center;
+}
+
+/* Loading and error message styling (can be global or scoped) */
+.resume-builder-page .loading-spinner { /* If scoped */
+    margin-top: 20px;
+    font-size: 1.2em;
+    color: #3498db;
+    text-align: center;
+}
+.resume-builder-page .error-message { /* If scoped */
+    color: #c0392b;
+    background-color: #fdd;
+    border: 1px solid #c0392b;
+    padding: 10px;
+    border-radius: 5px;
+    margin: 15px 0;
+}
