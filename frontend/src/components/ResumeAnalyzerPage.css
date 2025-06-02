@@ -1,0 +1,81 @@
+/* frontend/src/components/ResumeAnalyzerPage.css */
+.resume-analyzer-page .analyzer-form {
+    margin-top: 20px;
+    padding: 20px;
+    background-color: #f9f9f9;
+    border-radius: 8px;
+    border: 1px solid #eee;
+}
+
+.resume-analyzer-page .form-group {
+    margin-bottom: 15px;
+}
+
+.resume-analyzer-page .form-group label {
+    display: block;
+    margin-bottom: 5px;
+    font-weight: bold;
+    color: #555;
+}
+
+.resume-analyzer-page input[type="file"] {
+    border: 1px solid #ddd;
+    padding: 8px;
+    width: 100%;
+    box-sizing: border-box;
+}
+
+.resume-analyzer-page button {
+    padding: 12px 20px;
+    font-size: 1.1em;
+}
+
+.resume-analyzer-page button:disabled {
+    background-color: #bdc3c7; /* Light gray for disabled */
+    cursor: not-allowed;
+}
+
+.error-message {
+    color: #c0392b; /* Red for errors */
+    background-color: #fdd;
+    border: 1px solid #c0392b;
+    padding: 10px;
+    border-radius: 5px;
+    margin-top: 15px;
+}
+
+.loading-spinner {
+    margin-top: 20px;
+    font-size: 1.2em;
+    color: #3498db;
+}
+
+.analysis-results-container {
+    margin-top: 30px;
+    text-align: left;
+}
+
+.analysis-results-container h3 {
+    color: #2c3e50;
+    border-bottom: 1px solid #eaeaea;
+    padding-bottom: 8px;
+}
+
+.json-display {
+    background-color: #2d2d2d; /* Dark background for JSON */
+    color: #f8f8f2;     /* Light text */
+    padding: 15px;
+    border-radius: 5px;
+    overflow-x: auto;     /* Allow horizontal scrolling for wide JSON */
+    font-family: 'Courier New', Courier, monospace;
+    font-size: 0.9em;
+    line-height: 1.4;
+    white-space: pre; /* Preserve whitespace but allow wrapping if needed by renderNested */
+}
+
+/* Styling for JSON parts */
+.json-key { color: #fd971f; /* Orange for keys */ }
+.json-string { color: #e6db74; /* Yellow for strings */ }
+.json-number { color: #ae81ff; /* Purple for numbers */ }
+.json-boolean { color: #f92672; /* Pink for booleans */ }
+.json-null { color: #cc6600; /* Brownish for null */ }
