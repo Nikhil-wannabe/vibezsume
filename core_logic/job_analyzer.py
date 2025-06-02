@@ -1,15 +1,32 @@
+"""
+Core logic for analyzing job descriptions and comparing them against resume data.
+
+This module provides functionalities to:
+1. Scrape job description text from a given URL.
+2. Extract potential keywords from text (job descriptions or resume sections).
+3. Compare a parsed resume with a job description to find matching skills and suggest areas for improvement.
+
+The methods used are often heuristic and may require tuning for optimal performance across various
+job sites and resume formats.
+"""
 import re
 import requests
 from bs4 import BeautifulSoup
 from typing import Dict, List, Optional, Any
+from collections import Counter # Moved import to top level for clarity
+
 # Assuming slm_module.parser defines EXPECTED_FIELDS or similar structure for parsed_resume
 # from slm_module.parser import EXPECTED_FIELDS # Or access it via a shared model definition
 
 # --- Constants & Basic Configuration ---
+
+# Standard headers to mimic a browser request, reducing likelihood of being blocked.
 DEFAULT_REQUEST_HEADERS = {
     'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36'
 }
-# Common keywords that might indicate skill sections or important parts of a job description
+
+# Regex patterns to identify common sections within a job description.
+# These help in potentially segmenting or prioritizing parts of the JD text, though not fully utilized yet.
 JOB_DESC_KEYWORD_PATTERNS = {
     "responsibilities": re.compile(r"(Responsibilities|What you'll do|Your role):", re.IGNORECASE),
     "qualifications": re.compile(r"(Qualifications|Requirements|Skills|Experience|Who you are|Ideal candidate):", re.IGNORECASE),
@@ -20,71 +37,144 @@ JOB_DESC_KEYWORD_PATTERNS = {
 def scrape_job_description_from_url(url: str) -> Optional[str]:
     """
     Scrapes the main textual content from a job description URL.
-    This is a very basic scraper and might need significant improvement for different job sites.
+
+    This function attempts to fetch the HTML content of the given URL and parse it
+    to extract the job description. It uses a series of heuristic selectors to identify
+    the main content area by targeting common HTML tags and class names associated
+    with job descriptions.
+
+    Args:
+        url (str): The URL of the job description page.
+
+    Returns:
+        Optional[str]: The extracted job description text as a single string,
+                       or None if scraping fails or no substantial content is found.
+
+    Important Operational Notes:
+    - **Heuristic Nature**: This is a basic, heuristic-based scraper. Its success heavily depends
+      on the HTML structure of the target website, which can vary significantly.
+    - **Limitations**:
+        - It may struggle with sites that heavily rely on JavaScript to render content dynamically
+          if the core job description isn't present in the initial HTML fetched by `requests`.
+        - Single Page Applications (SPAs) or sites with complex login/interaction requirements
+          will likely not work.
+        - Websites with strong anti-scraping measures might block requests or return captchas.
+    - **Selector Robustness**: The list of `potential_containers` (selectors like `div` with class
+      `job-description`) is based on common patterns but is not exhaustive and might become outdated
+      as website designs change. It might fail on job sites with unique or frequently updated structures.
+    - **Content Cleaning**: Basic cleaning (removing scripts, styles, etc.) is performed, but some
+      irrelevant content might still be included.
+    - **Alternatives**: For robust and production-level scraping, consider dedicated scraping
+      frameworks (e.g., Scrapy, Playwright, Selenium) or professional web scraping services.
+    - **Error Handling**: Basic error handling for network issues and HTTP errors is included, but
+      unexpected site structures can lead to incomplete or incorrect extraction.
     """
     try:
+        # Make an HTTP GET request to the URL, using defined headers and a timeout.
         response = requests.get(url, headers=DEFAULT_REQUEST_HEADERS, timeout=10)
-        response.raise_for_status() # Raise an exception for bad status codes
+        response.raise_for_status() # Raise an HTTPError for bad responses (4XX or 5XX)
 
+        # Parse the HTML content of the page.
         soup = BeautifulSoup(response.content, 'html.parser')
 
-        # Attempt to find common tags/attributes for job descriptions
-        # This is highly heuristic and will vary widely between job sites.
-        # Common selectors: 'div.job-description', 'article.job-description', id="jobDescription"
-        # For a more generic approach, we can try to remove nav, footer, header, script, style
-        # and then get text from main content areas.
-
-        for tag_name in ['script', 'style', 'nav', 'footer', 'header', 'aside']:
+        # Attempt to remove common irrelevant parts of the page (scripts, styles, nav, footer, etc.)
+        # This helps to isolate the main content.
+        for tag_name in ['script', 'style', 'nav', 'footer', 'header', 'aside', 'form', 'iframe']:
             for tag in soup.find_all(tag_name):
-                tag.decompose()
+                tag.decompose() # Removes the tag and its content from the parse tree.
 
-        # Try some common selectors
+        # Define a list of potential selectors for the main job description content.
+        # These are tried in order. More specific selectors are usually better.
         potential_containers = [
-            soup.find('div', class_=re.compile(r"job-description|jobdescription|description|jobDetails|jobdetails", re.I)),
-            soup.find('article', class_=re.compile(r"job-description|jobdescription", re.I)),
-            soup.find(id=re.compile(r"jobDescription|jobdescription", re.I)),
-            soup.find('main'), # Fallback to main content
-            soup.body # Fallback to body
+            soup.find('div', class_=re.compile(r"job-description|jobdescription|description|content|jobDetails|jobdetails", re.I)),
+            soup.find('article', class_=re.compile(r"job-description|jobdescription|content", re.I)),
+            soup.find(id=re.compile(r"jobDescription|jobdescription|content", re.I)),
+            soup.find('div', role='main'), # Added common role attribute
+            soup.find('main'),             # HTML5 main content tag
+            soup.body                      # Last resort: the entire body text
         ]
 
         text_content = ""
+        # Iterate through potential containers and take the first one that yields substantial text.
         for container in potential_containers:
             if container:
-                text_content = container.get_text(separator='\n', strip=True)
-                if len(text_content) > 300: # Assume a reasonable length for a job desc
+                # Extract text, using newline as separator and stripping whitespace from lines.
+                current_text = container.get_text(separator='\n', strip=True)
+                # Prioritize longer text, assuming it's more likely the JD.
+                if len(current_text) > len(text_content):
+                    text_content = current_text
+                
+                # If a very long piece of text is found, assume it's the main content and break.
+                if len(text_content) > 1000: # Increased threshold for more confidence
                     break
-
-        return text_content.strip() if text_content.strip() else None
+        
+        # Return the cleaned text if it's not empty, otherwise None.
+        return text_content.strip() if text_content and text_content.strip() else None
 
     except requests.exceptions.RequestException as e:
+        # Handle network-related errors (DNS failure, connection timeout, etc.).
         print(f"Error fetching URL {url}: {e}")
         return None
     except Exception as e:
+        # Handle other potential errors during scraping (e.g., parsing errors).
         print(f"Error scraping job description from {url}: {e}")
         return None
 
 # --- Text Processing & Keyword Extraction ---
 def extract_keywords_from_text(text: str, min_keyword_length: int = 3, top_n: int = 50) -> List[str]:
     """
-    A very simple keyword extraction method.
-    Extracts potential keywords (alphanumeric, possibly with hyphens/dots) from text.
-    This is not true NLP keyword extraction but a basic heuristic.
+    Extracts potential keywords from a given block of text.
+
+    This function performs a simple frequency-based keyword extraction. It tokenizes
+    the text into words, converts them to lowercase, removes common stop words and
+    short words, and then returns the most frequent remaining words.
+
+    Args:
+        text (str): The text to extract keywords from.
+        min_keyword_length (int): The minimum length for a word to be considered a keyword.
+        top_n (int): The maximum number of most frequent keywords to return.
+
+    Returns:
+        List[str]: A list of extracted keywords, sorted by frequency in descending order.
+
+    Important Notes:
+    - This is a heuristic method and not a sophisticated Natural Language Processing (NLP)
+      keyword extraction technique (like TF-IDF, RAKE, YAKE, or model-based approaches).
+    - **Frequency-Based**: Its core logic relies on word frequency, which may not always
+      correlate with actual importance or relevance in the context of skills or job requirements.
+    - **Single Word Focus**: It primarily extracts single words. Multi-word keywords (e.g.,
+      "machine learning", "data analysis") are not identified as single units unless they are
+      hyphenated or concatenated in the text (e.g., "machine-learning").
+    - **Stop Word List**: The effectiveness of filtering depends on the `stop_words` list. While
+      expanded, it might still need domain-specific additions for optimal results in certain contexts.
+    - **Context Agnostic**: The extraction does not consider the semantic context of words.
     """
     if not text:
         return []
 
-    # Remove common punctuation, convert to lower, split into words
-    words = re.findall(r'\b[a-zA-Z0-9.-]+\b', text.lower())
+    # Use regex to find words: sequences of alphanumeric characters, allowing hyphens and dots within words.
+    # Convert text to lowercase to ensure case-insensitive keyword matching.
+    words = re.findall(r'\b[a-zA-Z0-9.-]+\b', text.lower()) # Tokenize and normalize case
 
-    # Filter out very short words and common stop words (very basic list)
-    stop_words = set(['and', 'the', 'is', 'in', 'it', 'to', 'a', 'of', 'for', 'on', 'with', 'as', 'at', 'by'])
+    # Expanded list of common English stop words to filter out noise.
+    # This list is conservative; for specific domains, it might need further extension.
+    stop_words = set([
+        'and', 'the', 'is', 'in', 'it', 'to', 'a', 'of', 'for', 'on', 'with', 'as', 'at', 'by', 'an', 'or', 'if',
+        'are', 'has', 'had', 'was', 'were', 'will', 'be', 'this', 'that', 'my', 'your', 'our', 'we', 'us', 'me',
+        'he', 'she', 'they', 'them', 'just', 'so', 'than', 'then', 'not', 'all', 'any', 'some', 'such', 'no', 'nor',
+        'can', 'do', 'get', 'go', 'up', 'out', 'about', 'who', 'what', 'when', 'where', 'why', 'how',
+        'job', 'role', 'company', 'experience', 'skill', 'skills', 'work', 'team', 'position', 'candidate',
+        'description', 'responsibilities', 'requirements', 'preferred', 'qualification', 'qualifications',
+        'etc', 'e.g', 'i.e', 'br', 'p', 'li', 'div', 'span', 'ul', 'ol', 'strong', 'em' # Common HTML/formatting words
+    ])
+    
+    # Filter words: must meet min_keyword_length and not be in stop_words.
     keywords = [word for word in words if len(word) >= min_keyword_length and word not in stop_words]
 
-    # Simple frequency count (can be improved with TF-IDF later if needed)
-    from collections import Counter
+    # Count the frequency of each keyword.
     keyword_counts = Counter(keywords)
 
-    # Return the most common keywords
+    # Return the `top_n` most common keywords.
     return [kw for kw, count in keyword_counts.most_common(top_n)]
 
 # --- Comparison Logic ---
@@ -93,61 +183,99 @@ def compare_resume_to_job_description(
     job_description_text: str
 ) -> Dict[str, Any]:
     """
-    Compares extracted resume data with job description text.
-    Highlights matching skills and potentially missing keywords.
-    `parsed_resume_data` is expected to be the output from the SLM parser.
+    Compares skills from parsed resume data with keywords extracted from a job description.
+
+    This function identifies skills present in the resume that match keywords in the job
+    description. It also suggests potential skills from the job description that might
+    be missing from the resume. A heuristic match score is calculated based on the overlap.
+
+    Args:
+        parsed_resume_data (Dict[str, Any]): A dictionary containing parsed resume information,
+                                             expected to have a "skills" key with a list of skills.
+        job_description_text (str): The text of the job description.
+
+    Returns:
+        Dict[str, Any]: A dictionary containing the comparison results:
+            - "matching_skills" (List[str]): Skills from the resume that are found (or are substrings of)
+                                             keywords in the job description. Original casing from resume is preserved.
+            - "missing_skills_from_jd" (List[str]): Keywords from the job description that are not found
+                                                    in the resume's skills. These are suggestions and may
+                                                    not all be actual skills.
+            - "job_summary_keywords" (List[str]): A sample of the most common keywords extracted from the
+                                                  job description (up to 20).
+            - "match_score_heuristic" (float): A naive percentage score representing the overlap between
+                                               resume skills and job description keywords. Ranges from 0.0 to 100.0.
     """
     comparison_results = {
         "matching_skills": [],
         "missing_skills_from_jd": [],
         "job_summary_keywords": [],
-        "match_score_heuristic": 0.0 # Very basic score
+        "match_score_heuristic": 0.0 # Initialize a basic heuristic score
     }
 
+    # Return empty results if essential inputs are missing.
     if not parsed_resume_data or not job_description_text:
         return comparison_results
 
-    # Extract keywords from job description
+    # Extract keywords from the job description text.
     jd_keywords_set = set(extract_keywords_from_text(job_description_text))
-    comparison_results["job_summary_keywords"] = sorted(list(jd_keywords_set))[:20] # Show some JD keywords
+    # Store a sample of JD keywords in the results for context.
+    comparison_results["job_summary_keywords"] = sorted(list(jd_keywords_set))[:20]
 
+    # Get skills from the resume data; default to an empty list if not present or not a list.
     resume_skills = parsed_resume_data.get("skills", [])
     if not isinstance(resume_skills, list): resume_skills = []
 
-    # Normalize resume skills to lower case for comparison
-    resume_skills_lower = set([str(skill).lower() for skill in resume_skills if skill])
+    # Normalize resume skills to lowercase for case-insensitive comparison.
+    # Filter out any None or empty skill entries.
+    resume_skills_lower = set([str(skill).lower() for skill in resume_skills if skill and str(skill).strip()])
 
-    # Find matching skills
-    matching_skills = []
+    # Find skills from the resume that match keywords in the job description.
+    matching_skills_found = []
     for r_skill_lower in resume_skills_lower:
-        # Direct match or if the resume skill is a substring of a JD keyword (e.g., "react" in "react.js")
+        # Check for direct match or if the resume skill is a substring of any JD keyword (e.g., "react" in "react.js").
         if r_skill_lower in jd_keywords_set or any(r_skill_lower in jd_kw for jd_kw in jd_keywords_set):
-            # Find original casing from resume_skills if possible
+            # Try to find the original casing of the skill from the resume for display purposes.
             original_skill = next((s for s in resume_skills if str(s).lower() == r_skill_lower), r_skill_lower)
-            matching_skills.append(original_skill)
+            matching_skills_found.append(original_skill)
+    
+    comparison_results["matching_skills"] = sorted(list(set(matching_skills_found)))
 
-    comparison_results["matching_skills"] = sorted(list(set(matching_skills)))
+    # Identify potential skills mentioned in the JD that are not present in the resume.
+    # This is heuristic: jd_keywords are raw frequent words and not necessarily all "skills".
+    # It filters out JD keywords that are already matched (directly or as superstrings) by resume skills.
+    missing_skills_suggestions = [
+        jd_kw for jd_kw in jd_keywords_set  # Iterate through all unique keywords from the job description
+        # Condition 1: The JD keyword is not directly present in the set of lowercase resume skills.
+        if jd_kw not in resume_skills_lower and 
+        # Condition 2: No resume skill is a substring of the current JD keyword.
+        # This avoids suggesting "java" if "javascript" is in resume skills and "javascript" is the jd_kw.
+        # However, it means if resume has "java" and JD has "javascript", "javascript" might still be suggested.
+        # A more nuanced check might be needed if this behavior is not desired.
+        not any(r_skill_lower in jd_kw for r_skill_lower in resume_skills_lower)
+    ]
+    # These are suggestions based on keyword matches and may not always represent actual required skills.
+    # Their relevance should be critically evaluated by the user.
+    comparison_results["missing_skills_from_jd"] = sorted(list(set(missing_skills_suggestions)))[:15] # Limit for brevity
 
-    # Identify skills mentioned in JD that are not in resume (based on JD keywords)
-    # This is very heuristic as jd_keywords are not necessarily "skills"
-    potential_jd_skills = jd_keywords_set
-    missing_skills = [jd_kw for jd_kw in potential_jd_skills if jd_kw not in resume_skills_lower and not any(r_skill in jd_kw for r_skill in resume_skills_lower)]
-    comparison_results["missing_skills_from_jd"] = sorted(list(set(missing_skills)))[:15] # Limit for display
-
-    # Basic match score: (Number of matching skills / Number of unique skills in resume + unique keywords in JD)
-    # This is a very naive score and can be improved significantly.
-    if resume_skills_lower or jd_keywords_set:
+    # Calculate a very naive heuristic match score.
+    # Score = (Number of matching skills / Total unique terms (skills in resume + keywords in JD)) * 100
+    # This score is basic and doesn't account for skill importance or context.
+    if resume_skills_lower or jd_keywords_set: # Avoid division by zero if both are empty
+        # Union of terms ensures each unique skill/keyword is counted once in the denominator.
         total_unique_terms = len(resume_skills_lower.union(jd_keywords_set))
         if total_unique_terms > 0:
-            comparison_results["match_score_heuristic"] = round((len(matching_skills) / total_unique_terms) * 100, 2)
+            comparison_results["match_score_heuristic"] = round((len(comparison_results["matching_skills"]) / total_unique_terms) * 100, 2)
         else:
-            comparison_results["match_score_heuristic"] = 0.0 if not matching_skills else 100.0
-
-
-    # Potential further analysis:
-    # - Check for matching keywords in experience descriptions.
-    # - Years of experience matching (requires parsing numbers and terms like "X+ years").
-    # - Education level matching.
+            # If total_unique_terms is 0, it means both resume_skills_lower and jd_keywords_set are empty.
+            # If matching_skills is somehow not empty (shouldn't happen if others are empty), score 100, else 0.
+            comparison_results["match_score_heuristic"] = 0.0 if not comparison_results["matching_skills"] else 100.0
+    
+    # Potential future enhancements:
+    # - Weight skills based on where they appear in the JD (e.g., "Required Skills" vs. "Preferred").
+    # - Analyze experience descriptions for contextual skill usage.
+    # - Parse and compare years of experience.
+    # - Match education levels and fields of study.
 
     return comparison_results
 
